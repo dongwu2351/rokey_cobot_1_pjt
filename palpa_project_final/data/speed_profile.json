@@ -1,0 +1,29 @@
+{
+ "free": 30.0,
+ "approach": 24.0,
+ "extract": 20.0,
+ "carry": 16.0,
+ "drop": 12.0,
+ "moves": {
+  "ord_extract": 60.0,
+  "lid_box_lift": 20.0,
+  "ord_descend": 60.0,
+  "ord_place": 60.0,
+  "lidclose_near": 60.0,
+  "ord_enter": 60.0,
+  "ord_carry_hub": 60.0,
+  "ord_carry_via": 60.0,
+  "lidopen_travel": 60.0,
+  "lid_comp_rotate": 31.0,
+  "lid_comp_descend": 10.0,
+  "lidclose_travel": 60.0,
+  "ord_to_lift": 60.0,
+  "lidopen_near": 60.0,
+  "ord_return": 60.0,
+  "waste_near": 60.0,
+  "waste_carry": 60.0,
+  "waste_dump": 60.0,
+  "waste_travel": 60.0
+ },
+ "op_speed": 100
+}

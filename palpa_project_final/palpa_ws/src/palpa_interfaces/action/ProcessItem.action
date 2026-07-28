@@ -1,0 +1,25 @@
+# ===== Goal =====
+# main_controller_node -> robot_controller_node 로 전달되는 검사 요청
+string order_id
+string item_id
+string item_type          # 예: "tennis_ball", "baseball"
+float32 weight_threshold_min
+float32 weight_threshold_max
+float32 diameter_threshold_min
+float32 diameter_threshold_max
+float32 elasticity_threshold_min
+float32 elasticity_threshold_max
+---
+# ===== Result =====
+bool success
+string item_id
+string final_stage         # PACKING 또는 REJECTING 로 종료
+float32 measured_weight
+float32 measured_diameter
+float32 measured_elasticity
+string reject_reason        # success=false 일 때만 사용, 아니면 빈 문자열
+---
+# ===== Feedback =====
+string item_id
+string current_stage        # PICKING / WEIGHING / MEASURING_DIAMETER / COMPRESSING / CLASSIFYING / PACKING / REJECTING
+float32 progress             # 0.0 ~ 1.0

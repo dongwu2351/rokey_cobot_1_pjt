@@ -1,0 +1,302 @@
+{
+ "홈부터 뚜껑닫는거까지_1": [
+  {
+   "t": "grip",
+   "width": 110,
+   "force": 40
+  },
+  {
+   "t": "move",
+   "id": 8,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 7,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "grip",
+   "width": 0,
+   "force": 10
+  },
+  {
+   "t": "move",
+   "id": 8,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 4,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 11,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 9,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 10,
+   "radius": 0,
+   "sync": 1
+  }
+ ],
+ "뚜껑여는거부터": [
+  {
+   "t": "grip",
+   "width": 110,
+   "force": 40
+  },
+  {
+   "t": "move",
+   "id": 4,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 11,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 9,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "grip",
+   "width": 0,
+   "force": 5
+  },
+  {
+   "t": "move",
+   "id": 11,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 4,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 8,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 7,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "grip",
+   "width": 110,
+   "force": 40
+  },
+  {
+   "t": "move",
+   "id": 4,
+   "radius": 0,
+   "sync": 1
+  }
+ ],
+ "전체": [
+  {
+   "t": "move",
+   "id": 4,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 11,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 9,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "grip",
+   "width": 0,
+   "force": 5
+  },
+  {
+   "t": "move",
+   "id": 10,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "movel",
+   "ax": 2,
+   "d": 40
+  },
+  {
+   "t": "grip",
+   "width": 0,
+   "force": 40
+  }
+ ],
+ "드는거 확인": [
+  {
+   "t": "move",
+   "id": 4,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 11,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 9,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "grip",
+   "width": 0,
+   "force": 5
+  },
+  {
+   "t": "move",
+   "id": 10,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "movel",
+   "ax": 2,
+   "d": 40
+  },
+  {
+   "t": "grip",
+   "width": 0,
+   "force": 40
+  }
+ ],
+ "폐기물 처리": [
+  {
+   "t": "grip",
+   "width": 110,
+   "force": 20
+  },
+  {
+   "t": "move",
+   "id": 4,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 24,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 25,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "grip",
+   "width": 0,
+   "force": 5.5
+  },
+  {
+   "t": "wait",
+   "sec": 2
+  },
+  {
+   "t": "move",
+   "id": 26,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 27,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 28,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 29,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 28,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 27,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 26,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 25,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "grip",
+   "width": 110,
+   "force": 20
+  },
+  {
+   "t": "move",
+   "id": 24,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 4,
+   "radius": 0,
+   "sync": 1
+  }
+ ]
+}

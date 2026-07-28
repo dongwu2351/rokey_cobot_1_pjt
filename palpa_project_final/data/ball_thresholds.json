@@ -1,0 +1,18 @@
+{
+  "type_split": 67.8,
+  "misgrip_min": 80.0,
+  "tennis": {
+    "nopress_max": 3.6,
+    "normal_max": 5.5,
+    "nopress_by": "comp",
+    "nopress_low": true,
+    "normal_by": "comp",
+    "normal_low": true
+  },
+  "baseball": {
+    "by": "comp",
+    "hard_low": true,
+    "hard_max": 2.55,
+    "hard_size_max": 73.38
+  }
+}

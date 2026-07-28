@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PALPA — M0609 · RG2 CONTROL</title>
+<style>
+:root{--ink-900:#101114;--ink-700:#2a2b30;--ink-500:#6b6b68;--ink-400:#8a8a86;--ink-300:#b5b5b0;
+--line:#e3e3df;--surface-2:#eeeeec;--paper:#f5f5f3;--on-ink-muted:#c9c9c9;
+--volt:#d7ff3f;--volt-dim:#b6db2f;--danger:#ff4d3d;--danger-soft:#ffe6e2;--warning:#ffbe2e;--warning-soft:#fff3d6;
+--success:#13b867;--success-bright:#00d978;--success-soft:#e7fff1;
+--font-display:'Arial Black','Helvetica Neue',Impact,sans-serif;
+--font-sans:'Pretendard','Helvetica Neue',Arial,'Noto Sans KR',system-ui,sans-serif;
+--font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;--radius-lg:14px}
+*{box-sizing:border-box;margin:0}
+body{background:var(--paper);font:400 14px/1.6 var(--font-sans);color:var(--ink-900)}
+.mono{font-family:var(--font-mono)}
+.kicker{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-400)}
+/* header */
+header{background:var(--ink-900);color:#fff;padding:16px 32px;display:flex;align-items:center;gap:20px}
+#brand{font-family:var(--font-display);font-style:italic;font-weight:900;font-size:24px;letter-spacing:-.01em}
+#hsub{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;color:var(--on-ink-muted);border-left:1px solid rgba(255,255,255,.2);padding-left:20px}
+#hright{margin-left:auto;display:flex;align-items:center;gap:20px}
+#tabsbar{background:var(--ink-900);padding:0 32px 14px;display:flex;gap:4px}
+.tab{background:transparent;border:none;color:var(--on-ink-muted);font:800 14px var(--font-sans);padding:9px 18px;cursor:pointer;border-bottom:3px solid transparent}
+.tab.sel{color:var(--volt);border-bottom-color:var(--volt)}
+main{max-width:1180px;margin:0 auto;padding:32px}
+.screen{display:none}.screen.sel{display:block}
+/* pills / tags / buttons */
+.spill{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800}
+.spill .d{width:9px;height:9px;border-radius:50%}
+.spill.ok .d{background:var(--volt)}.spill.idle .d{background:var(--ink-300)}.spill.danger .d{background:var(--danger)}
+.spill .detail{font-weight:400;color:var(--ink-400);font-size:11px}
+.spill.inv{color:#fff}
+.tag{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;font-size:12px;font-weight:800;border-radius:4px}
+.tag.volt{background:var(--volt);color:var(--ink-900)}.tag.voltsoft{background:#f0ffc9;color:#3c4c00}
+.tag.danger{background:var(--danger);color:#fff}.tag.warning{background:var(--warning);color:var(--ink-900)}
+.tag.muted{background:var(--surface-2);color:var(--ink-500)}.tag.outline{background:none;border:1px solid var(--line);color:var(--ink-400)}
+.btn{border:2px solid var(--ink-900);background:#fff;color:var(--ink-900);font:800 13px var(--font-sans);padding:10px 16px;cursor:pointer;border-radius:0}
+.btn:hover{background:var(--surface-2)}.btn:active{transform:translate(1px,1px)}
+.btn.primary{background:var(--volt);border-color:var(--volt)}.btn.primary:hover{background:var(--volt-dim)}
+.btn.dark{background:var(--ink-900);color:#fff}.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.onink{background:transparent;border-color:rgba(255,255,255,.35);color:#fff}
+.btn.ghost{border-color:transparent}.btn.sm{padding:6px 12px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:default}
+/* panel */
+.panel{background:#fff;border:1px solid var(--line);border-radius:var(--radius-lg);padding:20px}
+.panel.inv{background:var(--ink-900);color:#fff}
+.phead{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
+.phead h3{font:800 17px var(--font-sans);line-height:1.2}
+.phead .act{margin-left:auto}
+/* sensor grid */
+.sg{display:grid;gap:1px;background:var(--line);border:1px solid var(--line)}
+.sg>div{background:#fff;padding:14px 16px}
+.sr .l{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-400)}
+.sr .v{font:900 22px/1.15 var(--font-sans)}.sr .u{font-size:12px;font-weight:700;color:var(--ink-400)}
+.sr.warn .v{color:#8a5a00}.sr.danger .v{color:var(--danger)}
+/* stepflow */
+.flow{display:flex;flex-wrap:wrap;gap:6px}
+.step{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;padding:5px 12px;border:1px solid var(--line);border-radius:999px;color:var(--ink-300);background:#fff}
+.step.done{background:var(--surface-2);color:var(--ink-500)}
+.step.now{background:var(--volt);border-color:var(--volt);color:var(--ink-900)}
+.flow-arrow{display:inline-flex;align-items:center;justify-content:center;color:var(--ink-300);font:900 17px/1 var(--font-mono);min-width:14px}
+.flow-arrow.active{color:var(--volt-dim);animation:arrowMove .75s ease-in-out infinite alternate}
+.flow.inv .flow-arrow{color:rgba(255,255,255,.22)}.flow.inv .flow-arrow.active{color:var(--volt)}
+@keyframes arrowMove{from{transform:translateX(-2px);opacity:.5}to{transform:translateX(3px);opacity:1}}
+.flow.inv .step{background:transparent;border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.4)}
+.flow.inv .step.done{color:var(--on-ink-muted)}
+.flow.inv .step.now{background:var(--volt);border-color:var(--volt);color:var(--ink-900)}
+.process-flow{flex-wrap:nowrap;gap:0;overflow:visible}
+.process-flow .step{flex:0 0 auto;padding:3px 5px;gap:2px;font-size:9.5px}
+.process-flow .flow-arrow{flex:0 0 auto;min-width:6px;font-size:11px}
+/* order / completion */
+.order-box{border:1px solid rgba(255,255,255,.18);padding:12px 14px;margin-bottom:18px;background:rgba(255,255,255,.045)}
+.order-list{display:grid;gap:7px;margin-top:8px}
+.order-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;font-size:12px}
+.order-row .name{font-weight:800;color:#fff}.order-row .qty{font:800 11px var(--font-mono);color:var(--on-ink-muted)}
+.order-row .state{font-size:10px;font-weight:900;letter-spacing:.04em;color:var(--volt)}
+.complete-card{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(210px,.75fr);gap:26px;align-items:stretch}
+.complete-title{font:italic 900 48px/.92 var(--font-display);letter-spacing:-.03em;margin:8px 0 16px}
+.weight-hero{background:var(--ink-900);color:#fff;padding:20px;display:flex;flex-direction:column;justify-content:center;min-height:190px}
+.weight-hero .number{font:italic 900 54px/.95 var(--font-display);color:var(--success-bright);letter-spacing:-.03em;margin-top:8px}
+.process-line{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:18px}
+.process-node{font-size:11px;font-weight:800;padding:6px 9px;background:var(--surface-2);border-radius:999px}
+.process-line .arr{font:900 14px var(--font-mono);color:var(--ink-300)}
+#clspanel.complete-mode{border-color:var(--success);background:linear-gradient(120deg,#fff 0%,var(--success-soft) 35%,#f4fff8 58%,#d9ffea 100%);background-size:220% 220%;animation:completeGradient 3.2s ease-in-out infinite alternate;box-shadow:0 12px 34px rgba(19,184,103,.16)}
+#clspanel.complete-mode .complete-title{color:var(--success)}
+#clspanel.complete-mode .weight-hero{box-shadow:inset 0 0 0 1px rgba(0,217,120,.3)}
+@keyframes completeGradient{from{background-position:0% 50%}to{background-position:100% 50%}}
+/* servo toggle */
+.servo-control{display:inline-flex;align-items:center;gap:10px;color:#fff;font-size:12px;font-weight:900;cursor:pointer;user-select:none}
+.servo-control input{position:absolute;opacity:0;pointer-events:none}
+.servo-track{width:54px;height:28px;border-radius:999px;background:#43454c;border:1px solid rgba(255,255,255,.25);padding:3px;transition:.2s;display:inline-flex}
+.servo-knob{width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 2px 7px rgba(0,0,0,.35);transition:.2s}
+.servo-control input:checked+.servo-track{background:var(--volt);border-color:var(--volt)}
+.servo-control input:checked+.servo-track .servo-knob{transform:translateX(26px);background:var(--ink-900)}
+.servo-control input:disabled+.servo-track{opacity:.45}
+/* table */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-400);border-bottom:2px solid var(--ink-900);padding:8px}
+td{border-bottom:1px solid var(--line);padding:8px}
+tr:hover td{background:var(--paper)}
+a.lnk{color:var(--ink-900);font-weight:800;cursor:pointer;text-decoration:underline;text-decoration-color:var(--volt);text-decoration-thickness:3px}
+a.del{color:var(--danger);cursor:pointer;font-weight:900;text-decoration:none}
+input[type=text],select{border:2px solid var(--line);padding:10px 12px;font:13px var(--font-sans);background:#fff}
+input.strong{border-color:var(--ink-900)}
+input[type=range]{width:100%;accent-color:var(--ink-900);height:26px}
+.panel.inv input[type=range]{accent-color:var(--volt)}
+.slrow{margin-bottom:12px}
+.slrow .lab{display:flex;justify-content:space-between;font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--ink-400);margin-bottom:2px}
+.slrow .lab b{font-family:var(--font-mono);color:var(--ink-900)}
+.pbar{height:8px;background:var(--surface-2);overflow:hidden;border-radius:4px}
+.pbar>i{display:block;height:100%;background:var(--ink-900)}
+.g{display:grid;gap:20px}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink-900);color:var(--volt);font-weight:800;border-radius:999px;padding:10px 24px;opacity:0;transition:.25s;pointer-events:none;z-index:99}
+@media(max-width:960px){.g2,.g3,.g21,.g12,.complete-card{grid-template-columns:1fr!important}}
+/* 블록코딩 C-블록 */
+.clist{display:flex;flex-direction:column}
+.dz{height:6px;margin:1px 0;border-radius:4px;transition:.1s}
+.dz.dzon{background:var(--volt);height:16px;box-shadow:0 0 0 2px var(--volt)}
+.blk{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:9px;color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.blk input,.blk select{font-weight:700;border-radius:5px;border:none;padding:2px 4px}
+.cblk{border-radius:11px;padding:5px 5px 7px 5px;margin:1px 0}
+.chead{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 8px;color:#fff;font-weight:800}
+.cbody{background:rgba(255,255,255,.16);border-radius:8px;margin:3px 3px 3px 16px;padding:2px 4px;min-height:14px}
+.blkbtn{padding:1px 6px;font-weight:800;background:rgba(0,0,0,.18);color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px}
+</style>
+</head>
+<body>
+
+<header>
+  <span id="brand">PALPA</span><span id="hsub">M0609 · RG2 CONTROL</span>
+  <div id="hright">
+    <span class="spill inv ok" id="hstate"><span class="d"></span><span id="hstatel">서보 ON</span></span>
+    <button class="btn danger sm" onclick="estop()">■ 즉시정지</button>
+  </div>
+</header>
+<div id="tabsbar">
+  <button class="tab sel" data-s="overview" onclick="tab(this)">개요</button>
+  <button class="tab" data-s="gripper" onclick="tab(this)">그리퍼</button>
+  <button class="tab" data-s="robot" onclick="tab(this)">로봇</button>
+  <button class="tab" data-s="teach" onclick="tab(this)">티칭</button>
+  <button class="tab" data-s="speed" onclick="tab(this)">속도</button>
+</div>
+
+<main>
+<!-- 보호정지 배너 -->
+<div id="banner" style="display:none;align-items:center;gap:16px;background:var(--danger-soft);border:2px solid var(--danger);padding:14px 18px;margin-bottom:24px">
+  <span class="tag danger">🛡 보호정지</span>
+  <span style="font-size:13px;color:var(--danger);font-weight:700" id="bannermsg">외력·충돌로 보호정지되었습니다. 복구 → 서보 ON 순서로 재개하세요.</span>
+  <button class="btn dark sm" style="margin-left:auto" onclick="api('/api/robot_recover');toast('로봇 복구')">🛡 로봇 복구</button>
+</div>
+
+<!-- ══ 개요 ══ -->
+<section class="screen sel" id="s-overview">
+  <div id="detect" style="display:flex;align-items:center;gap:14px;padding:14px 20px;margin-bottom:20px;background:#fff;border:2px solid var(--line);border-radius:var(--radius-lg)">
+    <span class="spill idle" id="detpill"><span class="d"></span><span id="detlab">물체 없음 · 감지 대기</span></span>
+    <span class="mono" style="margin-left:auto;font-size:12px;color:var(--ink-400)" id="detw">그리퍼 폭 —</span>
+  </div>
+
+  <div class="g g21" style="grid-template-columns:1.3fr 1fr;align-items:start;margin-bottom:20px">
+    <div class="panel" id="clspanel">
+      <div class="phead"><div><div class="kicker">Classification</div><h3 id="clstitle">판별 결과</h3></div>
+        <span class="act" id="clstag"><span class="tag outline">대기</span></span></div>
+      <div id="clsbody">
+        <div style="text-align:center;padding:38px 0;color:var(--ink-400)">
+          <div style="font-family:var(--font-display);font-style:italic;font-weight:900;font-size:30px;color:var(--ink-300);margin-bottom:8px">측정 대기</div>
+          <div style="font-size:12.5px;margin-bottom:16px">작업을 시작하거나 그리퍼 탭에서 공을 측정하세요.</div>
+          <button class="btn primary" onclick="startWork()">▶ 작업 시작</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel inv" style="border-radius:var(--radius-lg)">
+      <div class="phead"><div><div class="kicker" style="color:var(--on-ink-muted)">Current Cycle</div><h3>현재 작업</h3></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+        <span class="tag voltsoft">🎾 유압·무압 → 포장</span><span class="tag danger">🎾 구멍 → 불량</span><span class="tag warning">⚾ 하드·소프트 → 주문따라 정렬</span>
+      </div>
+      <div class="order-box">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span class="kicker" style="color:var(--on-ink-muted)">접수 주문</span>
+          <span id="ordercount" class="mono" style="font-size:11px;color:var(--volt)">대기</span>
+        </div>
+        <div class="order-list" id="orderlist">
+          <div style="font-size:12px;color:var(--on-ink-muted)">주문이 들어오면 품목과 수량이 여기에 표시됩니다.</div>
+        </div>
+      </div>
+      <div class="flow inv process-flow" id="flow1" style="margin-bottom:20px"></div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <button class="btn primary" onclick="startWork()">▶ 작업 시작</button>
+        <button class="btn onink" onclick="api('/api/stop_work');toast('중단')">■ 중단</button>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span style="color:var(--on-ink-muted);font-size:11px;font-weight:800;letter-spacing:.08em">목표 포장</span>
+          <input type="number" id="wcount" min="1" max="50" value="1"
+            style="width:58px;padding:8px;border:2px solid var(--volt);background:transparent;color:#fff;font:800 15px var(--font-mono);text-align:center">
+          <span style="color:var(--on-ink-muted);font-size:12px">개</span>
+          <span class="tag volt" id="batchlab" style="display:none"></span>
+        </span>
+      </div>
+      <div class="mono" style="font-size:11px;color:var(--on-ink-muted);margin-top:14px" id="cyclemsg">대기 중</div>
+    </div>
+  </div>
+
+  <div class="g g3" style="grid-template-columns:1fr 1fr 1fr;align-items:stretch">
+    <div class="panel">
+      <div class="phead"><div><div class="kicker">Gripper</div><h3>그리퍼 상태</h3></div>
+        <span class="act" id="griptag"><span class="tag muted">개방</span></span></div>
+      <div style="margin-bottom:16px" id="objtag"><span class="tag muted">○ 물체 없음</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:800;color:var(--ink-400);margin-bottom:6px">
+        <span>너비</span><span class="mono" style="color:var(--ink-900)" id="wtext">— / 101.3 mm</span></div>
+      <div class="pbar" style="margin-bottom:16px"><i id="wbar" style="width:0%"></i></div>
+      <div class="sg" style="grid-template-columns:1fr 1fr">
+        <div class="sr"><div class="l">설정 파지력</div><div class="v"><span id="v_force">—</span> <span class="u">N</span></div></div>
+        <div class="sr"><div class="l">툴 외력 |F|</div><div class="v"><span id="v_tf">—</span> <span class="u">N</span></div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="phead"><div><div class="kicker">Live Telemetry</div><h3>연결 상태</h3></div></div>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">
+        <span class="spill idle" id="p_robot"><span class="d"></span>로봇 M0609 <span class="detail" id="p_robot_d">—</span></span>
+        <span class="spill idle" id="p_grip"><span class="d"></span>그리퍼 RG2 <span class="detail" id="p_grip_d">—</span></span>
+      </div>
+      <div class="sg" style="grid-template-columns:1fr 1fr">
+        <div class="sr"><div class="l">총 매달린 무게</div><div class="v"><span id="v_wt">—</span> <span class="u">kg</span></div></div>
+        <div class="sr"><div class="l">작업 속도</div><div class="v"><span id="v_spd">20</span> <span class="u">deg/s</span></div></div>
+      </div>
+    </div>
+    <div class="panel inv" style="display:flex;flex-direction:column;justify-content:center">
+      <div class="kicker" style="color:var(--on-ink-muted)">자동판정 정확도</div>
+      <div style="font:900 64px/0.9 var(--font-sans);font-style:italic;color:var(--volt)"><span id="accval">—</span><span style="font-size:26px">%</span></div>
+      <div style="font-size:12px;color:var(--on-ink-muted);margin-top:8px" id="accnote">저장된 라벨을 현재 임계값으로 재분류한 일치율</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 그리퍼 ══ -->
+<section class="screen" id="s-gripper">
+  <div class="g g12" style="grid-template-columns:1fr 1.2fr;align-items:start">
+    <div class="panel">
+      <div class="phead"><div><div class="kicker">Gripper Control</div><h3>그리퍼 제어</h3></div>
+        <span class="act"><span class="spill ok" id="gconn"><span class="d"></span>연결됨</span></span></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px" id="objtag2"><span class="tag muted">○ 물체 없음</span>
+        <span class="mono" style="font-size:13px;color:var(--ink-500)" id="gwidth">폭 —</span></div>
+      <div class="slrow"><div class="lab"><span>너비 (mm)</span><b id="gwv">60</b></div>
+        <input type="range" id="gw" min="0" max="110" step="1" value="60" oninput="el('gwv').textContent=this.value" onchange="api('/api/set?width='+this.value)"></div>
+      <div class="slrow"><div class="lab"><span>파지력 (N)</span><b id="gfv">20</b></div>
+        <input type="range" id="gf" min="3" max="40" step="1" value="20" oninput="el('gfv').textContent=this.value" onchange="api('/api/force?n='+this.value)"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+        <button class="btn sm" onclick="nudge(-1)">− 조이기</button>
+        <button class="btn sm" onclick="nudge(1)">+ 벌리기</button>
+        <button class="btn sm" onclick="setW(110)">완전 열기</button>
+        <button class="btn sm dark" onclick="setW(0)">완전 닫기</button>
+        <button class="btn sm ghost" onclick="api('/api/recover');toast('그리퍼 복구')">🔧 복구</button>
+      </div>
+    </div>
+    <div class="g">
+      <div class="panel">
+        <div class="phead"><div><div class="kicker">Force–Width Curve</div><h3>공 검증 측정</h3></div>
+          <span class="act" id="mtag"></span></div>
+        <div style="border:1px solid var(--line);padding:12px;margin-bottom:16px"><svg id="curve" viewBox="0 0 420 190" width="100%" height="190"></svg></div>
+        <div class="mono" id="mnote" style="font-size:12px;color:var(--ink-500);margin-bottom:16px">측정 없음</div>
+        <button class="btn primary" style="width:100%" onclick="api('/api/measure');toast('공 측정 시작')">공 측정 시작 · 5N 접촉 → 40N 강성</button>
+        <div style="font-size:11px;color:var(--ink-400);margin:12px 0 4px;font-weight:700">🎾 테니스공 라벨</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn sm" style="flex:1;border-color:#34d399;color:#34d399" onclick="mSave('유압')">🟢 유압</button>
+          <button class="btn sm" style="flex:1;border-color:#f87171;color:#f87171" onclick="mSave('구멍')">🔴 구멍</button>
+          <button class="btn sm" style="flex:1;border-color:#58a6ff;color:#58a6ff" onclick="mSave('무압')">🔵 무압</button>
+        </div>
+        <div style="font-size:11px;color:var(--ink-400);margin:10px 0 4px;font-weight:700">⚾ 야구공 라벨</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn sm" style="flex:1;border-color:#fbbf24;color:#fbbf24" onclick="mSave('하드')">🟡 하드</button>
+          <button class="btn sm" style="flex:1;border-color:#fb923c;color:#fb923c" onclick="mSave('소프트')">🟠 소프트</button>
+        </div>
+        <div style="font-size:11px;color:var(--ink-400);margin:10px 0 4px;font-weight:700">⚪ 잘못 잡힘 (안잡힘 경계 학습용)</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn sm" style="flex:1;border-color:#8b949e;color:#8b949e" onclick="mSave('미검출')">⚪ 미검출 (오파지)</button>
+        </div>
+        <button class="btn" style="width:100%;margin-top:12px;background:#1b2a63;border:1px solid #33489e;color:#eaf0ff;font-weight:800" onclick="calcThresh()">⚙ 임계값 자동계산 (저장된 라벨 기반)</button>
+        <div id="threshinfo" class="mono" style="font-size:11px;color:var(--ink-500);margin-top:6px"></div>
+      </div>
+      <div class="panel">
+        <div class="phead"><div><div class="kicker">Saved Measurements</div><h3>저장된 측정 <span id="savedn">0</span>개</h3></div>
+          <span class="act"><a class="lnk" href="/api/measure_csv">⬇ CSV</a></span></div>
+        <div class="kicker" style="margin-bottom:2px">🎾 테니스 판정 분포 <span id="distax" style="color:var(--ink-400);font-weight:600"></span> (점선=임계값)</div>
+        <div id="distwrap" style="border:1px solid var(--line);padding:6px;margin-bottom:10px"><svg id="distchart" viewBox="0 0 440 175" width="100%" height="155"></svg></div>
+        <div class="kicker" style="margin-bottom:2px">⚾ 야구 판정 분포 <span id="distaxbb" style="color:var(--ink-400);font-weight:600"></span> (점선=임계값)</div>
+        <div style="border:1px solid var(--line);padding:6px;margin-bottom:10px"><svg id="distchartbb" viewBox="0 0 440 175" width="100%" height="155"></svg></div>
+        <div class="kicker" style="margin-bottom:2px">📏 크기 분포 · 전체 (점선=종류경계)</div>
+        <div style="border:1px solid var(--line);padding:6px;margin-bottom:10px"><svg id="sizechart" viewBox="0 0 440 175" width="100%" height="155"></svg></div>
+        <div class="kicker" style="margin-bottom:2px">크기 × 눌림 산점도 (색=판정)</div>
+        <div style="border:1px solid var(--line);padding:6px;margin-bottom:12px"><svg id="scatterchart" viewBox="0 0 440 165" width="100%" height="150"></svg></div>
+        <div id="savedtbl" style="max-height:200px;overflow:auto"><span style="color:var(--ink-400);font-size:13px">아직 저장 없음</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 로봇 ══ -->
+<section class="screen" id="s-robot">
+  <div class="g">
+    <div class="panel">
+      <div class="phead"><div><div class="kicker">Auto Cycle</div><h3>자동 작업</h3></div>
+        <span class="act" id="cyctag"><span class="tag outline">대기</span></span></div>
+      <div class="slrow" style="max-width:320px"><div class="lab"><span>작업 속도</span><b id="wspdv">40</b></div>
+        <input type="range" id="wspd" min="5" max="40" step="5" value="40" oninput="el('wspdv').textContent=this.value;el('v_spd').textContent=this.value"></div>
+      <div class="flow process-flow" id="flow2" style="margin:16px 0 20px"></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button class="btn primary" onclick="startWork()">▶ 작업 시작</button>
+        <button class="btn danger" onclick="api('/api/stop_work');toast('중단')">■ 중단</button>
+        <span style="flex:1"></span>
+        <button class="btn" onclick="api('/api/compliance?on=1');toast('🖐 펜던트로 넘기기')">🖐 펜던트로 넘기기</button>
+        <button class="btn dark" onclick="api('/api/compliance?on=0');toast('🔄 ROS로 회수')">🔄 ROS로 회수</button>
+      </div>
+    </div>
+    <div class="g g2" style="grid-template-columns:1fr 1fr">
+      <div class="panel"><div class="phead"><div><div class="kicker">Base Frame</div><h3>툴 외력 (N)</h3></div></div>
+        <div class="sg" style="grid-template-columns:repeat(3,1fr)" id="tfgrid"></div></div>
+      <div class="panel"><div class="phead"><div><div class="kicker">Tool Frame</div><h3>툴 모멘트 (Nm)</h3></div></div>
+        <div class="sg" style="grid-template-columns:repeat(3,1fr)" id="tmgrid"></div></div>
+    </div>
+    <div class="panel"><div class="phead"><div><div class="kicker">Joint Torque</div><h3>관절 토크 (Nm)</h3></div></div>
+      <div class="kicker" style="margin-bottom:8px">외력 토크 J1~J6</div>
+      <div class="sg" style="grid-template-columns:repeat(6,1fr);margin-bottom:16px" id="extgrid"></div>
+      <div class="kicker" style="margin-bottom:8px">토크 센서 J1~J6</div>
+      <div class="sg" style="grid-template-columns:repeat(6,1fr)" id="jtgrid"></div></div>
+    <div class="panel"><div class="phead"><div><div class="kicker">Payload</div><h3>물체 무게</h3></div>
+        <span class="act"><button class="btn sm" onclick="api('/api/tare');toast('무게 영점')">⚖ 영점</button></span></div>
+      <div class="sg" style="grid-template-columns:repeat(3,1fr)">
+        <div class="sr" id="objw"><div class="l">물체 무게 (Fz 영점)</div><div class="v">—</div></div>
+        <div class="sr"><div class="l">툴 외력 |F|</div><div class="v"><span id="v_tf2">—</span> <span class="u">N</span></div></div>
+        <div class="sr"><div class="l">총 매달린 무게</div><div class="v"><span id="v_wt2">—</span> <span class="u">kg</span></div></div>
+      </div></div>
+  </div>
+</section>
+
+<!-- ══ 티칭 ══ -->
+<section class="screen" id="s-teach">
+  <div class="g g12" style="grid-template-columns:1fr 1.15fr;align-items:start">
+    <div class="g">
+      <div class="panel">
+        <div class="phead"><div><div class="kicker">Jog</div><h3>로봇 이동</h3></div></div>
+        <div style="background:var(--warning-soft);border:1px solid var(--warning);padding:10px 12px;font-size:11.5px;color:#8a5a00;margin-bottom:18px;line-height:1.5">⚠ 축 이동 전 안전 경로를 확인하세요. 보호정지 시 자동 재이동하지 않으므로 원인을 확인한 뒤 수동 복구하세요.</div>
+        <div class="g g2" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+          <div class="slrow"><div class="lab"><span>이동 속도</span><b id="jogv">10</b></div>
+            <input type="range" id="jog" min="5" max="12" value="10" oninput="el('jogv').textContent=this.value"></div>
+          <div class="slrow"><div class="lab"><span>충돌 민감도(배치 전 고정)</span><b id="colv">10</b></div>
+            <input type="range" id="col" min="10" max="10" step="1" value="10" disabled></div>
+        </div>
+        <div class="kicker" style="margin-bottom:6px">관절 조그 (J1~J6)</div>
+        <div id="jogsliders"></div>
+        <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
+          <div class="lab" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:800">직교좌표 조그 · BASE (X/Y/Z)</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-400)">스텝
+              <select id="jogstep" style="padding:2px 6px"><option>1</option><option selected>5</option><option>10</option><option>50</option></select> mm/°</span>
+          </div>
+          <div id="cartjog" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+          <div style="font-size:11px;color:var(--ink-400);margin-top:8px">−/+ 버튼으로 해당 축 스텝만큼 직선(MoveL) 이동. 자세(RX/RY/RZ)는 도(°) 단위.</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="phead"><div><div class="kicker">Raw Registers</div><h3>그리퍼 레지스터 258~</h3></div></div>
+        <div id="regs" class="mono" style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;font-size:11px"></div>
+      </div>
+    </div>
+    <div class="g">
+      <div class="panel"><div class="phead"><div><div class="kicker">Base Axes</div><h3>작업축 BASE</h3></div></div>
+        <div class="sg" style="grid-template-columns:repeat(3,1fr)" id="axgrid"></div></div>
+      <div class="panel">
+        <div class="phead"><div><div class="kicker">Point Teaching · DART</div><h3>저장된 포인트 <span id="wpn">0</span>개</h3></div>
+          <span class="act" style="display:flex;gap:8px"><a class="lnk" href="/api/wp_download">⬇ 파일</a>
+            <button class="btn sm ghost" onclick="if(confirm('전체 삭제?'))api('/api/wp_clear')">🗑 전체삭제</button></span></div>
+        <div id="wptbl"></div>
+        <div style="display:flex;gap:8px;padding-top:16px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="wpname" class="strong" placeholder="포인트 이름 (예: 파지접근)" style="flex:1;min-width:140px">
+          <input type="text" id="wpnote" placeholder="메모 (예: 공 위 5cm)" style="flex:1;min-width:140px">
+          <button class="btn dark" onclick="wpSave()">📍 현재 자세 저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ══ 블록코딩 에디터 (전체폭) ══ -->
+  <div class="g g12" style="grid-template-columns:1.5fr 1fr;align-items:start;margin-top:0">
+    <div class="panel">
+      <div class="phead"><div><div class="kicker">Block Coding · 시퀀스</div><h3>블록 프로그램</h3></div>
+        <span class="act" style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink-400)">속도
+          <input type="range" id="seqvel" min="5" max="50" value="20" style="width:80px" oninput="el('seqvelv').textContent=this.value"><b id="seqvelv" style="font-weight:800">20</b></span></div>
+      <!-- 팔레트 -->
+      <div style="font-size:11px;color:var(--ink-400);font-weight:700;margin-bottom:4px">블록 추가 (클릭·드래그)</div>
+      <div id="palette" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+      <div id="palchips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px"></div>
+      <!-- 프로그램 리스트 -->
+      <div id="proglist" ondragover="event.preventDefault()" ondrop="progDrop(event,null)" style="min-height:60px;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn primary" style="flex:1;font-weight:800" onclick="progRun(0)">▶ 전체 실행</button>
+        <button class="btn" style="background:#3d1414;border-color:#f87171;color:#f87171;font-weight:800" onclick="api('/api/motion_stop');toast('정지')">⏹ 정지</button>
+        <button class="btn ghost" onclick="window.PROG=[];renderProg()">비우기</button>
+      </div>
+      <div id="progstat" class="mono" style="font-size:11px;color:var(--volt);margin-top:8px;font-weight:700"></div>
+    </div>
+    <div class="g">
+      <!-- radius 시각화 -->
+      <div class="panel">
+        <div class="phead"><div><div class="kicker">Radius 시각화</div><h3>블렌딩 호 미리보기</h3></div></div>
+        <div style="border:1px solid var(--line);padding:8px"><svg id="radviz" viewBox="0 0 300 160" width="100%" height="150"></svg></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <span style="font-size:12px;font-weight:700">radius</span>
+          <input type="range" id="radslider" min="0" max="60" value="20" style="flex:1" oninput="drawRadius(this.value)">
+          <b id="radval" style="font-weight:800;min-width:44px;text-align:right">20mm</b>
+        </div>
+        <div style="font-size:11px;color:var(--ink-500);margin-top:4px">0=정지(각지게), 클수록 코너를 크게 돌아 무정지. 동기=정지, 비동기+radius=블렌딩 통과.</div>
+      </div>
+      <!-- 저장된 시퀀스(함수) -->
+      <div class="panel">
+        <div class="phead"><div><div class="kicker">Saved · 함수</div><h3>저장된 시퀀스</h3></div>
+          <span class="act"><a class="lnk" href="/api/prog_download">⬇ 읽기용파일</a></span></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input type="text" id="progname" placeholder="시퀀스 이름 (예: 뚜껑닫기)" style="flex:1;font-weight:700">
+          <button class="btn dark" style="font-weight:800" onclick="progSave()">💾 저장</button>
+        </div>
+        <div id="savedprogs"><span style="color:var(--ink-400);font-size:13px">저장된 시퀀스 없음</span></div>
+        <div id="progview" class="mono" style="font-size:11px;white-space:pre-wrap;color:var(--ink-500);margin-top:10px;max-height:180px;overflow:auto"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 속도 ══ -->
+<section class="screen" id="s-speed">
+  <div class="g g12" style="grid-template-columns:1.3fr 1fr;align-items:start">
+    <!-- 좌: 이동별 속도 -->
+    <div class="panel">
+      <div class="phead"><div><div class="kicker">Per-Move Speed · 1:1</div><h3>웨이포인트 이동별 속도</h3></div>
+        <span id="sptag" class="tag outline">불러오는 중…</span></div>
+      <div style="background:var(--warning-soft);border:1px solid var(--warning);padding:10px 12px;font-size:11.5px;color:#8a5a00;margin-bottom:16px;line-height:1.55">
+        각 <b>웨이포인트 이동 구간</b>을 개별로 조절합니다. 값이 <b>그대로(1:1)</b> 적용되고 안전을 위해 줄이지 않습니다 —
+        경로를 먼저 확인하세요. <b>[적용·저장] 후 다음 주문/실행부터</b> 반영됩니다.</div>
+      <div id="spmoves"></div>
+      <div style="border-top:1px solid var(--line);margin-top:6px;padding-top:16px">
+        <div class="slrow"><div class="lab"><span>전역 배속 (모든 이동 × %)</span><b id="sp_op_v">100</b>%</div>
+          <input type="range" id="sp_op" min="1" max="100" step="1" value="100" oninput="el('sp_op_v').textContent=this.value;spMark('op_speed')">
+          <div style="font-size:11px;color:var(--ink-500);margin-top:2px">100%면 위 이동속도 그대로(1:1). 낮추면 전체가 그 비율로 느려집니다.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn primary" style="flex:1;font-weight:800" onclick="spApply()">✔ 적용 · 저장</button>
+        <button class="btn ghost" onclick="spReset()">기본값</button>
+      </div>
+      <div id="spmsg" class="mono" style="font-size:11px;color:var(--volt);margin-top:8px;font-weight:700"></div>
+    </div>
+    <!-- 우: 주문 테스트 + 안내 -->
+    <div class="g">
+      <div class="panel" style="border:2px solid var(--volt)">
+        <div class="phead"><div><div class="kicker">Test Order · 실제 흐름</div><h3>여기서 주문 넣고 바로 테스트</h3></div>
+          <span id="sptest_tag" class="tag outline">대기</span></div>
+        <div style="font-size:11.5px;color:var(--ink-500);margin-bottom:12px;line-height:1.5">
+          주문을 넣으면 <b>실제 주문과 100% 동일한 경로</b>(뚜껑 열기 → 파지·판별·포장 → 뚜껑 닫기)로 움직입니다.
+          위 속도를 바꿔가며 반복 테스트하세요.</div>
+        <div class="lab" style="font-size:11px;font-weight:800;color:var(--ink-400);margin-bottom:6px">① 품목 선택</div>
+        <div id="sptest_sku" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+          <span style="font-size:12px;font-weight:800">수량</span>
+          <input type="number" id="sptest_qty" min="1" max="3" value="1" style="width:52px;text-align:center">
+          <span style="font-size:12px;font-weight:800">패키지</span>
+          <select id="sptest_pkg" style="width:76px"><option value="0">자동</option></select>
+          <button class="btn sm dark" style="font-weight:800;flex:1" onclick="spCartAdd()">🛒 담기</button>
+        </div>
+        <div class="lab" style="font-size:11px;font-weight:800;color:var(--ink-400);margin-bottom:6px;display:flex;justify-content:space-between">
+          <span>② 장바구니 · 패키지별</span><span id="spcart_tot" style="font-family:var(--font-mono)">0개</span></div>
+        <div id="spcart" style="border:1px solid var(--line);padding:8px;margin-bottom:12px;min-height:52px"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn primary" style="flex:1;font-weight:800" onclick="spOrder()">▶ 주문 실행</button>
+          <button class="btn ghost" onclick="spCartClear()">비우기</button>
+          <button class="btn" style="background:#3d1414;border-color:#f87171;color:#f87171;font-weight:800" onclick="spStop()">⏹</button>
+        </div>
+        <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+          <button class="btn" style="width:100%;font-weight:800;border-color:#8b5cf6;color:#8b5cf6"
+                  onclick="spWaste()">🗑 폐기물 처리 실행</button>
+          <div style="font-size:11px;color:var(--ink-500);margin-top:6px;line-height:1.5">
+            P5→P25→P26 파지 → P27→P28→P29→P30 비움 → 되돌려놓고 P5.
+            주문 중 <b>불량이 나오면 무게측정 후 자동 실행</b>됩니다.</div>
+        </div>
+        <div id="sptest_stat" class="mono" style="font-size:11.5px;color:var(--volt);margin-top:10px;font-weight:700;min-height:16px"></div>
+        <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px;font-size:11px;color:var(--ink-500);line-height:1.6">
+          <b>패키지 1개 = 포장 튜브 1개</b>(뚜껑 열기 → 채우기 → 뚜껑 닫기). 최대 3개까지 담기고
+          <b>종류는 섞여도 됩니다</b>. 4개 이상이면 자동으로 나뉘며, 담을 때 패키지를 직접 고르거나
+          목록에서 <b>P1/P2 드롭다운으로 옮길</b> 수 있습니다.<br>
+          패키지가 여러 개면 <b>앞 패키지가 끝난 뒤 다음이 자동으로 시작</b>됩니다
+          (한 패키지가 미완료로 끝나면 뒤는 중단).<br>
+          패키지 안에서는 담은 순서대로 탐색합니다. 실행 중 <b>다른 품목이 잡혀도 그 패키지에 남아있으면 즉시 포장</b>,
+          불량(구멍)은 <b>P7 폐기</b>, 필요 없는 공은 <b>원래 종류 슬롯으로 반납</b>합니다.
+        </div>
+      </div>
+      <div class="panel">
+        <div class="phead"><div><div class="kicker">안내</div><h3>이동 = 실제속도 × 배속%</h3></div></div>
+        <div style="font-size:11.5px;color:var(--ink-500);line-height:1.65">
+          단위: <b>관절 이동 °/s</b>, <b>순응/Z 이동 mm/s</b>, <b>회전 °/s</b>.<br>
+          예) 공 빼내기 20°/s · 배속 100% → 20°/s 그대로.<br>
+          가속도는 이동속도에 비례해 자동 계산.<br>
+          저장하면 <b>speed_profile.json</b>에 남아 재시작해도 유지.<br>
+          <span style="color:var(--ink-400)">회복/훈련 등 예외 이동은 기본 프로파일 속도를 씁니다.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 서보 액션바 -->
+<div style="max-width:1180px;margin:0 auto;padding:0 32px 40px">
+  <div style="display:flex;align-items:center;gap:10px;margin-top:8px;padding:16px 20px;background:var(--ink-900);flex-wrap:wrap">
+    <label class="servo-control" title="토글하여 서보 ON/OFF">
+      <input type="checkbox" id="servo_toggle" onchange="setServo(this.checked)">
+      <span class="servo-track"><span class="servo-knob"></span></span>
+      <span id="servo_toggle_label">서보 상태 확인</span>
+    </label>
+    <span style="width:1px;height:22px;background:rgba(255,255,255,.2);margin:0 6px"></span>
+    <button class="btn sm onink" onclick="api('/api/robot_recover');toast('로봇 복구')">🛡 로봇 복구</button>
+    <button class="btn sm onink" onclick="api('/api/tare');toast('무게 영점')">⚖ 무게 영점</button>
+    <button class="btn sm onink" onclick="api('/api/home');toast('홈 이동')">🏠 홈</button>
+    <span class="slrow" style="display:flex;align-items:center;gap:8px;margin:0 0 0 10px">
+      <span style="color:var(--on-ink-muted);font-size:11px;font-weight:800;letter-spacing:.1em">전체속도</span>
+      <input type="range" id="ops" min="10" max="40" step="5" value="20" style="width:120px"
+        onchange="api('/api/op_speed?v='+this.value);toast('전체속도 '+this.value+'%')">
+    </span>
+    <button class="btn sm danger" style="margin-left:auto" onclick="estop()">■ 즉시정지</button>
+  </div>
+</div>
+</main>
+<div id="toast"></div>
+
+<script>
+const el=id=>document.getElementById(id);
+const ROLES={'':'(자동)','pick':'잡는위치','via':'경유지','via2':'집은후경유','pack':'포장','defect':'불량','home':'홈'};
+const STEPS=['홈','개방','진입','잡기','판정','추출','이송','놓기','복귀'];
+const STEPICONS=['⌂','◯','↘','✊','◎','↗','➜','□','↩'];
+const STEPMAP={'①':1,'②':2,'③':2,'④':3,'⑤':4,'⑥':5,'⑦':6,'⑧':7,'⑨':8,'⑩':8,'⑪':8};
+function api(u){return fetch(u).catch(()=>{})}
+function toast(m,ms){const t=el('toast');t.textContent=m;t.style.opacity=1;clearTimeout(t._h);t._h=setTimeout(()=>t.style.opacity=0,ms||1800)}
+function setServo(on){
+ const t=el('servo_toggle'),l=el('servo_toggle_label');
+ if(t)t.disabled=true;if(l)l.textContent=on?'서보 ON 요청 중':'서보 OFF 요청 중';
+ fetch(on?'/api/servo_on':'/api/servo_off').then(r=>r.json()).then(d=>{
+   toast(d.msg||(on?'서보 ON':'서보 OFF'));
+ }).catch(()=>toast('서보 명령 전송 실패')).finally(()=>{if(t)t.disabled=false});
+}
+function orderName(k){
+ const m={tennis_normal:'테니스 유압',tennis_nopress:'테니스 무압',
+          baseball_hard:'야구 하드',baseball_soft:'야구 소프트'};
+ return m[k]||k;
+}
+function orderIcon(k){return k==='tennis_normal'?'🟢':k==='tennis_nopress'?'🔵':k==='baseball_hard'?'🟡':k==='baseball_soft'?'🟠':'●'}
+function renderOrderList(cy){
+ const box=el('orderlist'),ct=el('ordercount');if(!box||!ct)return;
+ const req=cy.order_requested||{},rem=cy.order_remaining||{},keys=Object.keys(req);
+ if(!keys.length){ct.textContent='대기';box.innerHTML='<div style="font-size:12px;color:var(--on-ink-muted)">주문이 들어오면 품목과 수량이 여기에 표시됩니다.</div>';return;}
+ const total=keys.reduce((a,k)=>a+(+req[k]||0),0),packed=keys.reduce((a,k)=>a+Math.max(0,(+req[k]||0)-(+rem[k]||0)),0);
+ ct.textContent=(cy.batch_completed?'완료 ':cy.active?'진행 ':'접수 ')+packed+' / '+total;
+ box.innerHTML=keys.map((k,i)=>{const q=+req[k]||0,p=Math.max(0,q-(+rem[k]||0));
+   const st=p>=q?'완료':p?'포장 '+p+'/'+q:(cy.target_item===k&&cy.active?'탐색 중':'대기');
+   return `<div class="order-row"><span class="name">${i+1}. ${orderIcon(k)} ${orderName(k)}</span>`
+    +`<span class="qty">${q}개</span><span class="state">${st}</span></div>`;}).join('');
+}
+function flowIndex(msg){
+ msg=msg||'';for(const c in STEPMAP)if(msg.startsWith(c))return STEPMAP[c];
+ if(msg.includes('뚜껑 열기'))return 0;if(msg.includes('파지'))return 3;
+ if(msg.includes('판정'))return 4;if(msg.includes('이송'))return 6;
+ if(msg.includes('복귀'))return 8;return -1;
+}
+function flowHtml(cy,done){
+ const cur=flowIndex(cy.msg);
+ return STEPS.map((s,i)=>{
+   const cls=done?'done':i===cur?'now':cur>=0&&i<cur?'done':'';
+   const step=`<span class="step ${cls}"><span aria-hidden="true">${STEPICONS[i]}</span>${s}</span>`;
+   if(i===0)return step;
+   const ac=cy.active&&((cur<0&&i===1)||i===cur)?'active':'';
+   return `<span class="flow-arrow ${ac}" aria-hidden="true">→</span>`+step;
+ }).join('');
+}
+function completionHtml(cy){
+ const req=cy.order_requested||{},rem=cy.order_remaining||{},keys=Object.keys(req);
+ const total=keys.reduce((a,k)=>a+(+req[k]||0),0);
+ const rows=keys.map(k=>{const q=+req[k]||0,p=Math.max(0,q-(+rem[k]||0));
+   return `<div style="display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--line)">`
+    +`<b>${orderIcon(k)} ${orderName(k)}</b><span class="mono">${p}/${q} 포장</span></div>`;}).join('');
+ const w=cy.completion_weight_kg,wsd=cy.completion_weight_sd;
+ return `<div class="complete-card"><div>
+   <div class="kicker">Packaging complete</div><div class="complete-title">포장 완료!</div>
+   <div style="font-size:14px;color:var(--ink-500);margin-bottom:12px">주문 공 <b style="color:var(--ink-900)">${total}개</b>를 모두 처리했습니다.</div>
+   <div>${rows}</div>
+   <div class="process-line"><span class="process-node">주문 접수</span><span class="arr">→</span>
+    <span class="process-node">${total}개 판별·포장</span><span class="arr">→</span>
+    <span class="process-node">뚜껑 잠금</span><span class="arr">→</span>
+    <span class="process-node">무게 검증</span><span class="arr">→</span>
+    <span class="process-node" style="background:var(--success);color:#fff">완료</span></div>
+  </div><div class="weight-hero"><div class="kicker" style="color:var(--on-ink-muted)">총 포장 무게</div>
+   <div class="number">${w!=null?Math.round(+w*1000).toLocaleString():'—'}<span style="font-size:20px;margin-left:6px">g</span></div>
+   ${wsd!=null?`<div style="font-size:13px;font-weight:800;color:#22c55e;margin-top:6px">± ${Math.round(+wsd*1000)} g <span style="font-weight:600;opacity:.85">측정 편차</span></div>`:''}
+   <div style="font-size:11px;color:var(--on-ink-muted);margin-top:12px">${w!=null?'뚜껑 잠금 후 통을 들어 측정한 값':'무게 측정값 없음'}</div>
+  </div></div>`;
+}
+function mSave(l){fetch('/api/measure_save?label='+encodeURIComponent(l)).then(r=>r.json()).then(d=>toast(d.msg||(l+' 저장'),2600)).catch(()=>toast('저장 실패'));}
+function calcThresh(){toast('임계값 계산 중...',2000);fetch('/api/calc_thresholds').then(r=>r.json()).then(d=>{
+ toast(d.msg||'계산 완료',6000);
+ const ti=el('threshinfo');if(ti){if(d.ok){const c=d.counts||{},n=(d.notes||[]);
+   ti.innerHTML='표본 '+Object.keys(c).map(k=>k+':'+c[k]).join(' · ')+(n.length?'<br>'+n.map(x=>'⚠ '+x).join('<br>'):'');
+   if(d.thresholds)window.__TH=d.thresholds;}else ti.textContent='';}
+}).catch(()=>toast('계산 실패'));}
+function tab(b){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('sel'));
+ document.querySelectorAll('.screen').forEach(x=>x.classList.remove('sel'));
+ b.classList.add('sel');el('s-'+b.dataset.s).classList.add('sel')}
+function startWork(){const n=el('wcount')?el('wcount').value:1;
+ api('/api/start_work?vel='+el('wspd').value+'&count='+n);toast('작업 시작 · 목표 포장 '+n+'개')}
+function estop(){api('/api/stop_work');api('/api/motion_stop');toast('즉시정지')}
+function setW(w){el('gw').value=w;el('gwv').textContent=w;api('/api/set?width='+w)}
+function nudge(d){const w=Math.max(0,Math.min(110,parseInt(el('gw').value)+d));setW(w)}
+function wpSave(){api('/api/wp_save?name='+encodeURIComponent(el('wpname').value)+'&note='+encodeURIComponent(el('wpnote').value));
+ el('wpname').value='';el('wpnote').value='';toast('포인트 저장')}
+function wpRole(i,v){api('/api/wp_update?i='+i+'&role='+encodeURIComponent(v));toast('역할: '+(ROLES[v]||v))}
+function wpEdit(i,f){const c=(window.WPS&&window.WPS[i])?(window.WPS[i][f]||''):'';const v=prompt(f==='name'?'이름':'메모',c);
+ if(v!==null)api('/api/wp_update?i='+i+'&'+f+'='+encodeURIComponent(v))}
+function wpGoto(i){if(confirm('P'+(i+1)+' 자세로 이동?'))api('/api/wp_goto?i='+i)}
+function jogTo(j,val){api('/api/movej?j='+j+'&val='+val+'&vel='+el('jog').value)}
+
+/* ForceCurve — 힘=Y축 눈금(왼쪽), 점엔 폭값만, 곡선 밑 반투명 fill */
+function drawCurve(mr,col,which){
+ const s=el(which||'curve'); if(!s)return;
+ const W=420,H=190,L=34,R=W-14,B=H-24,T=16;
+ col=col||'#8b949e';
+ const P=(mr&&mr.points&&mr.points.length>=2)?mr.points.map(p=>({f:+p.force,w:+p.width})):null;
+ const frame=`<text x="${L-4}" y="${T-4}" font-size="9" fill="#6b7280" text-anchor="end" font-family="monospace">힘N</text>`
+   +`<text x="${R}" y="${B+16}" font-size="9" fill="#6b7280" text-anchor="end" font-family="monospace">← 폭(mm) 닫힘</text>`
+   +`<line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="#b6bcc7" stroke-width="1.2"/>`
+   +`<line x1="${L}" y1="${B}" x2="${L}" y2="${T-8}" stroke="#b6bcc7" stroke-width="1.2"/>`;
+ if(!P){ s.innerHTML=frame+`<text x="${(W+L)/2}" y="${H/2}" text-anchor="middle" font-size="12" fill="#9aa0aa">측정 대기</text>`; return; }
+ const ws=P.map(p=>p.w), fs=P.map(p=>p.f);
+ const pad=Math.max(1.4,(Math.max(...ws)-Math.min(...ws))*0.18);
+ const wmin=Math.min(...ws)-pad, wmax=Math.max(...ws)+pad, fmax=Math.max(45,...fs);
+ const px=w=>L+(wmax-w)/(wmax-wmin)*(R-L), py=f=>B-f/fmax*(B-T);
+ let ticks='';[5,10,20,30,40].forEach(f=>{const y=py(f);
+   ticks+=`<line x1="${L}" y1="${y.toFixed(1)}" x2="${R}" y2="${y.toFixed(1)}" stroke="#e6e9f0" stroke-width="1" stroke-dasharray="2 5"/>`
+     +`<text x="${L-4}" y="${(y+3).toFixed(1)}" font-size="9" fill="#7a818e" text-anchor="end" font-family="monospace">${f}</text>`;});
+ const XY=P.map(p=>[px(p.w),py(p.f)]);
+ const line='M'+XY.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L ');
+ const area=line+` L ${XY[XY.length-1][0].toFixed(1)},${B} L ${XY[0][0].toFixed(1)},${B} Z`;
+ const dots=XY.map((p,i)=>{const right=p[0]<R-42, lx=right?p[0]+7:p[0]-7, anc=right?'start':'end';
+   return `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.6" fill="${col}" stroke="#ffffff" stroke-width="1.4"/>`
+     +`<text x="${lx.toFixed(1)}" y="${(p[1]+3.5).toFixed(1)}" font-size="10.5" font-weight="700" fill="#1b2a63" text-anchor="${anc}" font-family="monospace">${P[i].w.toFixed(1)}</text>`;}).join('');
+ s.innerHTML=frame+ticks
+   +`<path d="${area}" fill="${col}" fill-opacity="0.25"/>`
+   +`<path d="${line}" fill="none" stroke="${col}" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/>`
+   +dots;
+}
+drawCurve(null);
+/* [코드, 이름, 태그클래스, 처리, 고유색] — 색은 그리퍼 탭 라벨링과 동일하게 맞춘다.
+   예전엔 하드·소프트·무압이 모두 'warning' 태그라 개요에서 전부 같은 색으로 보였다. */
+function kindOf(cls){if(!cls)return null;
+ if(cls.includes('구멍')||cls.includes('불량'))return['defect','구멍(불량)','danger','불량 이송','#ef4444'];
+ if(cls.includes('하드'))return['hard','하드','warning','포장/정렬','#eab308'];
+ if(cls.includes('소프트'))return['soft2','소프트','warning','포장/정렬','#f97316'];
+ if(cls.includes('무압'))return['soft','무압','warning','포장 이송','#3b82f6'];
+ if(cls.includes('유압')||cls.includes('정상'))return['normal','유압','volt','포장 이송','#22c55e'];
+ if(cls.includes('잘못')||cls.includes('놓침')||cls.includes('없음'))return[null,'재시도','warning','재시도','#8b949e'];return null}
+function colorOf(cls){const c=cls||'';
+ if(c.includes('구멍')||c.includes('불량'))return'#f87171';
+ if(c.includes('하드'))return'#fbbf24'; if(c.includes('소프트'))return'#fb923c';
+ if(c.includes('무압'))return'#58a6ff'; if(c.includes('유압')||c.includes('정상'))return'#34d399';
+ return'#8b949e';}
+/* grip_config.classify 와 동일 로직(JS) — 라벨명 반환. 정확도 계산용 */
+/* grip_config.classify()의 미러 — 정확도 배지/그래프용. 백엔드와 규칙이 반드시 같아야 함. */
+const BBKEY={size:'hard_size_max',comp:'hard_max',w40:'w40_max',strain:'strain_max',creep:'creep_max'};
+function jsClassify(size,comp,TH,creep,w40){TH=TH||{};if(size==null||comp==null)return null;
+ if(size>=(TH.misgrip_min||90))return'미검출';
+ if(comp>(TH.comp_max_sane||6.0))return'접촉오류';
+ if(w40==null)w40=size-comp;                       // 크기−눌림(5N 접촉오차 소거)
+ const F={size:size,comp:comp,w40:w40,creep:(creep==null?null:creep),
+          strain:(size?comp/size:null)};
+ const pick=by=>(F[by]==null?F.comp:F[by]);
+ if(size>=(TH.type_split||70)){const b=TH.baseball||{};
+   const by=b.by||'comp',m=pick(by),v=b[BBKEY[by]||'hard_max'];
+   const bv=(v==null?(b.hard_max||3.0):v);
+   const isHard=(b.hard_low===false)?m>bv:m<=bv;
+   return isHard?'하드':'소프트';}
+ const t=TH.tennis||{};
+ const m1=pick(t.nopress_by||'comp'),n1=(t.nopress_max!=null?t.nopress_max:3.1);
+ if((t.nopress_low===false)?(m1>n1):(m1<=n1))return'무압';
+ const m2=pick(t.normal_by||'comp'),n2=(t.normal_max!=null?t.normal_max:3.8);
+ if((t.normal_low===false)?(m2>n2):(m2<=n2))return'유압';
+ return'구멍';}
+/* 데모용 그래프 2종: 분류 분포(눌림량) + 크기·눌림 산점도 — 저장 데이터 기반 */
+/* 테니스 눌림 판정 밴드 — 배경 색띠=판정구역, 점=실측. 같은색 구역에 있으면 정답 */
+/* 판정 밴드 차트(공용) — 배경 색띠=판정구역, 점=실측, 검정테두리=오분류.
+   feat: 어떤 특징 축으로 그릴지('comp'|'w40'|'size'). 임계값이 고른 특징을 그대로 따라간다.
+   zones: [[하한,상한,색,이름],...],  cuts: [[경계값,색],...]  */
+const FEATV={comp:r=>+r.comp_total, w40:r=>+r.w40, size:r=>+r.size, creep:r=>+r.creep,
+             strain:r=>(+r.size?(+r.comp_total)/(+r.size):NaN)};
+const FEATNM={comp:'눌림량(mm)',w40:'크기−눌림 = 40N너비(mm)',size:'크기(mm)',creep:'크립(mm)',
+              strain:'변형률(눌림÷크기)'};
+function drawBand(elId,saved,classes,feat,cuts,emptyMsg,zoneDefs){
+ // classes: [[라벨,색,(기대구역idx)],...] 점 행.  zoneDefs: 배경 구역 [[이름,색],...]
+ //   기대구역을 따로 줄 수 있어 '구역 2개 · 라벨 3개'(예: 무압 vs 유압+구멍)도 그릴 수 있다.
+ const s=el(elId);if(!s)return;
+ const vb=(s.getAttribute('viewBox')||'0 0 440 175').split(/\s+/);
+ const W=+vb[2]||440, H=+vb[3]||175, L=46,R=W-14,B=H-30,T=24;
+ const zones=zoneDefs||classes;
+ const get=FEATV[feat]||FEATV.comp;
+ const data=classes.map(c=>[c[0],c[1],(saved||[]).filter(x=>x.label===c[0]).map(get).filter(v=>!isNaN(v))]).filter(c=>c[2].length);
+ if(!data.length){s.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="11" fill="#9aa0aa">${emptyMsg}</text>`;return;}
+ const all=data.flatMap(c=>c[2]),cv=cuts.map(c=>c[0]);
+ const pad=(Math.max(...all,...cv)-Math.min(...all,...cv))*0.12+0.25;
+ const cmin=Math.min(...all,...cv)-pad, cmax=Math.max(...all,...cv)+pad;
+ const px=c=>L+(c-cmin)/(cmax-cmin)*(R-L);
+ // 구역 = 경계로 쪼갠 칸에 클래스 색/이름을 순서대로 배정
+ const edges=[cmin,...cv,cmax];
+ let h='';
+ zones.forEach((c,i)=>{const x0=px(edges[i]),x1=px(edges[i+1]);
+   h+=`<rect x="${x0.toFixed(1)}" y="${T}" width="${Math.max(0,x1-x0).toFixed(1)}" height="${B-T}" fill="${c[1]}" fill-opacity="0.12"/>`
+     +`<text x="${((x0+x1)/2).toFixed(1)}" y="${T-8}" font-size="10.5" font-weight="800" fill="${c[1]}" text-anchor="middle">${c[0]}</text>`;});
+ cuts.forEach(e=>{const x=px(e[0]);
+   h+=`<line x1="${x.toFixed(1)}" y1="${T}" x2="${x.toFixed(1)}" y2="${B}" stroke="${e[1]}" stroke-width="1.5" stroke-dasharray="4 3"/>`
+     +`<text x="${x.toFixed(1)}" y="${B+24}" font-size="9.5" font-weight="800" fill="${e[1]}" text-anchor="middle">${e[0]}</text>`;});
+ const zoneOf=v=>{let i=0;while(i<cv.length&&v>cv[i])i++;return i;};   // 값이 속한 구역 번호
+ const rh=(B-T)/data.length;
+ data.forEach((c,i)=>{const y=T+rh*(i+0.5);
+   const src=classes.find(x=>x[0]===c[0])||[];
+   const want=(src[2]!=null)?src[2]:classes.findIndex(x=>x[0]===c[0]);
+   h+=`<text x="${L-8}" y="${(y+4).toFixed(1)}" font-size="11.5" font-weight="800" fill="${c[1]}" text-anchor="end">${c[0]}</text>`;
+   c[2].forEach((v,j)=>{const yj=y+((j%3)-1)*4.5,wrong=zoneOf(v)!==want;
+     h+=`<circle cx="${px(v).toFixed(1)}" cy="${yj.toFixed(1)}" r="4.2" fill="${c[1]}" stroke="${wrong?'#111':'#fff'}" stroke-width="${wrong?2:1}"/>`;});});
+ h+=`<line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="#b6bcc7"/>`
+   +`<text x="${R}" y="${B+24}" font-size="9" fill="#6b7280" text-anchor="end">${FEATNM[feat]||feat} →</text>`
+   +`<text x="${L-8}" y="${T-8}" font-size="8.5" fill="#9aa0aa" text-anchor="end">테두리검정=오분류</text>`;
+ s.innerHTML=h;}
+
+/* 테니스: 무압|유압|구멍.
+   두 경계가 서로 다른 축을 쓰면(예: 무압/유압=크기, 유압/구멍=눌림) 한 그래프에 못 담으므로
+   경계마다 자기 축으로 하나씩 그린다. 같은 축이면 예전처럼 3구역 한 장. */
+function drawDist(saved){
+ const wrap=el('distwrap'); if(!wrap)return;
+ const t=(window.__TH||{}).tennis||{};
+ const b1=t.nopress_by||'comp', b2=t.normal_by||'comp';
+ const np=(t.nopress_max!=null)?+t.nopress_max:2.35, nm=(t.normal_max!=null)?+t.normal_max:3.28;
+ const L1=(t.nopress_low===false), L2=(t.normal_low===false);
+ const C={무압:'#3b82f6',유압:'#22c55e',구멍:'#ef4444'};
+ if(b1===b2){
+   if(wrap.dataset.mode!=='one'){wrap.dataset.mode='one';
+     wrap.innerHTML='<svg id="distchart" viewBox="0 0 440 175" width="100%" height="155"></svg>';}
+   drawBand('distchart',saved,[['무압',C.무압],['유압',C.유압],['구멍',C.구멍]],
+            b1,[[np,'#2563eb'],[nm,'#dc2626']],'테니스(무압·유압·구멍) 라벨 저장 시 표시');
+   return;}
+ // 축이 다름 → 2장
+ if(wrap.dataset.mode!=='two'){wrap.dataset.mode='two';
+   wrap.innerHTML='<div style="font-size:10.5px;font-weight:800;color:#2563eb;margin:2px 0 0 4px">① 무압 vs 유압+구멍</div>'
+     +'<svg id="distchart" viewBox="0 0 440 150" width="100%" height="128"></svg>'
+     +'<div style="font-size:10.5px;font-weight:800;color:#dc2626;margin:6px 0 0 4px;border-top:1px solid var(--line);padding-top:5px">② 유압 vs 구멍</div>'
+     +'<svg id="distchart2" viewBox="0 0 440 150" width="100%" height="128"></svg>';}
+ // ①: 무압 vs 나머지 — nopress 축
+ drawBand('distchart',saved,
+          L1?[['무압',C.무압,1],['유압',C.유압,0],['구멍',C.구멍,0]]
+            :[['무압',C.무압,0],['유압',C.유압,1],['구멍',C.구멍,1]],
+          b1,[[np,'#2563eb']],'테니스 라벨 저장 시 표시',
+          L1?[['유압+구멍','#8b949e'],['무압',C.무압]]:[['무압',C.무압],['유압+구멍','#8b949e']]);
+ // ②: 유압 vs 구멍 — normal 축
+ drawBand('distchart2',saved,
+          L2?[['유압',C.유압],['구멍',C.구멍]]:[['구멍',C.구멍],['유압',C.유압]],
+          b2,[[nm,'#dc2626']],'유압·구멍 라벨 저장 시 표시');}
+
+/* 크기 분포 — 5종 전부 크기축에 올려 종류경계와 무압 쏠림을 눈으로 확인.
+   판정에 크기를 안 쓰더라도 '어떤 공이 얼마나 큰가'는 별도로 볼 가치가 있다. */
+function drawSizeDist(saved){
+ const s=el('sizechart');if(!s)return;
+ const W=440,H=175,L=46,R=W-14,B=H-30,T=24;
+ const TH=window.__TH||{},ts=(TH.type_split!=null)?+TH.type_split:70,mg=(TH.misgrip_min!=null)?+TH.misgrip_min:80;
+ const cls=[['무압','#3b82f6'],['유압','#22c55e'],['구멍','#ef4444'],['하드','#eab308'],['소프트','#f97316']];
+ const data=cls.map(c=>[c[0],c[1],(saved||[]).filter(x=>x.label===c[0]).map(x=>+x.size).filter(v=>!isNaN(v))]).filter(c=>c[2].length);
+ if(!data.length){s.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="11" fill="#9aa0aa">라벨 저장 시 표시</text>`;return;}
+ const all=data.flatMap(c=>c[2]);
+ const cmin=Math.min(...all,ts)-1.2, cmax=Math.max(...all,ts)+1.2;
+ const px=v=>L+(v-cmin)/(cmax-cmin)*(R-L);
+ let h='';
+ // 테니스/야구 구역
+ h+=`<rect x="${px(cmin).toFixed(1)}" y="${T}" width="${(px(ts)-px(cmin)).toFixed(1)}" height="${B-T}" fill="#3b82f6" fill-opacity="0.07"/>`
+   +`<rect x="${px(ts).toFixed(1)}" y="${T}" width="${(px(cmax)-px(ts)).toFixed(1)}" height="${B-T}" fill="#eab308" fill-opacity="0.07"/>`
+   +`<text x="${((px(cmin)+px(ts))/2).toFixed(1)}" y="${T-8}" font-size="10.5" font-weight="800" fill="#3b82f6" text-anchor="middle">테니스</text>`
+   +`<text x="${((px(ts)+px(cmax))/2).toFixed(1)}" y="${T-8}" font-size="10.5" font-weight="800" fill="#eab308" text-anchor="middle">야구</text>`
+   +`<line x1="${px(ts).toFixed(1)}" y1="${T}" x2="${px(ts).toFixed(1)}" y2="${B}" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4 3"/>`
+   +`<text x="${px(ts).toFixed(1)}" y="${B+24}" font-size="9.5" font-weight="800" fill="#7c3aed" text-anchor="middle">${ts}</text>`;
+ if(mg<cmax)h+=`<line x1="${px(mg).toFixed(1)}" y1="${T}" x2="${px(mg).toFixed(1)}" y2="${B}" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="2 3"/>`
+   +`<text x="${px(mg).toFixed(1)}" y="${B+24}" font-size="9" font-weight="800" fill="#dc2626" text-anchor="middle">잘못잡힘 ${mg}</text>`;
+ // 라벨별 점 + 중앙값 막대(무압 쏠림이 보이도록)
+ const rh=(B-T)/data.length;
+ data.forEach((c,i)=>{const y=T+rh*(i+0.5);
+   const sorted=[...c[2]].sort((a,b)=>a-b),med=sorted[Math.floor(sorted.length/2)];
+   h+=`<text x="${L-8}" y="${(y+4).toFixed(1)}" font-size="11.5" font-weight="800" fill="${c[1]}" text-anchor="end">${c[0]}</text>`
+     +`<line x1="${px(sorted[0]).toFixed(1)}" y1="${y.toFixed(1)}" x2="${px(sorted[sorted.length-1]).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c[1]}" stroke-width="1" stroke-opacity="0.35"/>`
+     +`<line x1="${px(med).toFixed(1)}" y1="${(y-7).toFixed(1)}" x2="${px(med).toFixed(1)}" y2="${(y+7).toFixed(1)}" stroke="${c[1]}" stroke-width="2.5"/>`;
+   c[2].forEach((v,j)=>{const yj=y+((j%3)-1)*4.2;
+     h+=`<circle cx="${px(v).toFixed(1)}" cy="${yj.toFixed(1)}" r="3.6" fill="${c[1]}" fill-opacity="0.75" stroke="#fff" stroke-width="0.8"/>`;});});
+ h+=`<line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="#b6bcc7"/>`
+   +`<text x="${R}" y="${B+24}" font-size="9" fill="#6b7280" text-anchor="end">크기(mm) →</text>`
+   +`<text x="${L-8}" y="${T-8}" font-size="8.5" fill="#9aa0aa" text-anchor="end">굵은선=중앙값</text>`;
+ s.innerHTML=h;}
+
+/* 야구: 하드|소프트 — 테니스와 동일 메커니즘, 임계값이 고른 특징 축으로 */
+function drawDistBB(saved){
+ const b=(window.__TH||{}).baseball||{};
+ const by=b.by||'comp', key=BBKEY[by]||'hard_max';
+ const cut=(b[key]!=null)?+b[key]:(b.hard_max||3.0);
+ const low=(b.hard_low!==false);                       // true면 경계 이하가 하드
+ const cls=low?[['하드','#eab308'],['소프트','#f97316']]:[['소프트','#f97316'],['하드','#eab308']];
+ drawBand('distchartbb',saved,cls,by,[[cut,'#a16207']],'야구(하드·소프트) 라벨 저장 시 표시');}
+/* 크기×눌림 산점도 — 세로선=테니스│야구 종류경계, 오른쪽=야구 하드│소프트 크기경계 */
+function drawScatter(saved){const s=el('scatterchart');if(!s)return;
+ const W=440,H=165,L=44,R=W-14,B=H-24,T=22;
+ const data=(saved||[]).map(x=>({s:+x.size,c:+x.comp_total,col:colorOf(x.class||x.label),lb:x.label})).filter(p=>!isNaN(p.s)&&!isNaN(p.c));
+ if(!data.length){s.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="11" fill="#9aa0aa">라벨 저장 시 산점도 표시</text>`;return;}
+ const TH=window.__TH||{};
+ const ss=data.map(p=>p.s),cc=data.map(p=>p.c);
+ const smin=Math.min(...ss)-2,smax=Math.max(...ss)+2,cmin=Math.min(...cc)-0.3,cmax=Math.max(...cc)+0.3;
+ const px=v=>L+(v-smin)/(smax-smin)*(R-L),py=v=>B-(v-cmin)/(cmax-cmin)*(B-T);
+ let h=`<line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="#b6bcc7"/><line x1="${L}" y1="${B}" x2="${L}" y2="${T-4}" stroke="#b6bcc7"/>`
+  +`<text x="${R}" y="${B+18}" font-size="9" fill="#6b7280" text-anchor="end">크기(mm) →   ← 작을수록 딱딱</text>`
+  +`<text x="${L-6}" y="${T-8}" font-size="9" fill="#6b7280" text-anchor="end">↑눌림</text>`;
+ // 종류경계(테니스│야구) — 세로선
+ if(TH.type_split!=null){const t=+TH.type_split;if(t>=smin&&t<=smax){const x=px(t);
+   h+=`<line x1="${x.toFixed(1)}" y1="${T}" x2="${x.toFixed(1)}" y2="${B}" stroke="#a855f7" stroke-width="1.4" stroke-dasharray="5 3"/>`
+     +`<text x="${(x-3).toFixed(1)}" y="${T+4}" font-size="9" font-weight="700" fill="#a855f7" text-anchor="end">테니스</text>`
+     +`<text x="${(x+3).toFixed(1)}" y="${T+4}" font-size="9" font-weight="700" fill="#a855f7" text-anchor="start">야구</text>`;}}
+ // 야구 하드│소프트 크기경계 — 세로선(by=size일 때)
+ const bb=TH.baseball||{};
+ if(bb.by==='size'&&bb.hard_size_max!=null){const t=+bb.hard_size_max;if(t>=smin&&t<=smax){const x=px(t);
+   h+=`<line x1="${x.toFixed(1)}" y1="${T}" x2="${x.toFixed(1)}" y2="${B}" stroke="#f59e0b" stroke-width="1.3" stroke-dasharray="3 3"/>`
+     +`<text x="${x.toFixed(1)}" y="${B-4}" font-size="8.5" font-weight="700" fill="#f59e0b" text-anchor="middle">하드│소프트 ${t}</text>`;}}
+ data.forEach(p=>{h+=`<circle cx="${px(p.s).toFixed(1)}" cy="${py(p.c).toFixed(1)}" r="4" fill="${p.col}" fill-opacity="0.8" stroke="#fff" stroke-width="0.8"/>`;});
+ // 범례
+ const leg=[['무압','#3b82f6'],['유압','#22c55e'],['구멍','#ef4444'],['하드','#fbbf24'],['소프트','#fb923c']];
+ leg.forEach((g,i)=>{const lx=L+i*72;h+=`<circle cx="${lx}" cy="${H-4}" r="3.5" fill="${g[1]}"/><text x="${lx+7}" y="${H-1}" font-size="9" font-weight="700" fill="#6b7280">${g[0]}</text>`;});
+ s.innerHTML=h;}
+
+function sgrid(id,labels,vals,units){el(id).innerHTML=labels.map((l,i)=>{
+ const v=vals&&vals[i]!=null?(+vals[i]).toFixed(1):'—';
+ const warn=vals&&Math.abs(vals[i])>20?' danger':'';
+ return `<div class="sr${warn}"><div class="l">${l}</div><div class="v">${v}${units?` <span class="u">${units[i]||units}</span>`:''}</div></div>`}).join('')}
+
+/* 직교좌표(BASE) 조그 — /api/movel?ax=&val=(절대) 사용, 현재 posx + 스텝 */
+const CAX=[['X','mm'],['Y','mm'],['Z','mm'],['RX','°'],['RY','°'],['RZ','°']];
+let cartBuilt=false;
+function buildCart(){el('cartjog').innerHTML=CAX.map((a,i)=>`
+ <div style="display:flex;align-items:center;gap:5px;background:var(--surface-2);padding:5px 6px;border:1px solid var(--line)">
+  <button class="btn sm" style="min-width:34px;padding:7px 0" onclick="jogL(${i},-1)">−</button>
+  <div style="flex:1;text-align:center;line-height:1.15"><b style="color:var(--volt)">${a[0]}</b><br><span class="mono" id="cv${i}" style="font-size:11px;color:var(--ink-600)">—</span></div>
+  <button class="btn sm" style="min-width:34px;padding:7px 0" onclick="jogL(${i},1)">+</button>
+ </div>`).join('');cartBuilt=true;}
+function jogL(ax,dir){const step=(parseFloat(el('jogstep').value)||5)*dir;  // 상대이동 — posx 불필요
+ fetch('/api/movel?ax='+ax+'&d='+step.toFixed(2)+'&vel='+el('jog').value);
+ toast(CAX[ax][0]+(dir>0?' +':' −')+Math.abs(step)+CAX[ax][1]);}
+/* ══ 블록코딩 에디터 (트리 모델 · C자 블록) ══ */
+window.PROG=window.PROG||[];window.PROGS=window.PROGS||[];window.PALCAT='이동';
+const IFTERMS=['유압','무압','구멍','하드','소프트','못잡음','주문필요','주문완료'];
+const BCOL={move:'#4c7cf3',grip:'#e0567a',measure:'#8b5cf6',wait:'#14b8a6',call:'#f59e0b',loop:'#e8892b',if:'#22a06b',movel:'#0ea5e9',movej1:'#6366f1',order:'#db2777',pack:'#059669'};
+const AXN=['X','Y','Z','RX','RY','RZ'];const ORDITEMS=['하드','소프트','유압','무압','구멍'];
+function newBlock(t,ex){const b=Object.assign({t},ex||{});
+ if(t==='loop'){b.count=2;b.body=[];}if(t==='if'){b.cond={op:'or',terms:[]};b.then=[];b.els=[];}
+ if(t==='move'){if(b.id===undefined)b.id=-1;b.radius=0;b.sync=1;}if(t==='grip'){b.width=60;b.force=20;}if(t==='wait')b.sec=1;
+ if(t==='movel'){b.ax=2;b.d=10;}if(t==='movej1'){b.j=0;b.deg=10;}if(t==='order'){b.item='하드';b.count=1;}
+ if(t==='loop')b.mode='count';return b;}
+function resolveList(lp){let cur=window.PROG;if(lp){const p=lp.split('.');for(let i=0;i<p.length;i+=2)cur=cur[+p[i]][p[i+1]];}return cur;}
+function nodeAt(lp,idx){const l=resolveList(lp);return l?l[idx]:null;}
+function sub(lp,idx,field){return (lp?lp+'.':'')+idx+'.'+field;}
+/* 팔레트 (카테고리 = 행) */
+function palCat(c){window.PALCAT=c;renderPalette();}
+function renderPalette(){const cats=['이동','그리퍼','판별','대기','제어','주문','함수'];
+ const cb=el('palette');if(cb)cb.innerHTML=cats.map(c=>`<button class="btn sm" style="font-weight:800;${window.PALCAT===c?'background:var(--ink-900);color:#fff':''}" onclick="palCat('${c}')">${c}</button>`).join('');
+ const c=el('palchips');if(!c)return;const wps=window.WPS||[],progs=window.PROGS||[];
+ const chip=(txt,pl,st)=>`<button class="btn sm" draggable="true" ondragstart="dragNew(event,'${pl}')" style="padding:4px 9px;font-size:12px;font-weight:700;cursor:grab;${st||''}" onclick="pAddNew('${pl}')">${txt}</button>`;
+ let h='';
+ if(window.PALCAT==='이동')h=chip('📍 이동(좌표)','move')+chip('🧭 베이스축 이동','movel')+chip('🦾 관절 이동','movej1')+'<span style="width:100%;height:0"></span>'+chip('🏠 홈','move:-1')+wps.map((w,i)=>chip('📍P'+(i+1)+' '+(w.name||''),'move:'+i)).join('');
+ else if(window.PALCAT==='그리퍼')h=chip('✊ 그리퍼','grip');
+ else if(window.PALCAT==='판별')h=chip('🔬 판별','measure');
+ else if(window.PALCAT==='대기')h=chip('⏱ 대기','wait');
+ else if(window.PALCAT==='제어')h=chip('🔁 반복','loop')+chip('❓ 만약(if)','if');
+ else if(window.PALCAT==='주문')h=chip('📋 주문 설정','order')+chip('📦 포장 카운트','pack');
+ else if(window.PALCAT==='함수')h=progs.length?progs.map(nm=>chip('📞'+nm,'call:'+encodeURIComponent(nm),'border-color:var(--volt);color:var(--volt)')).join(''):'<span style="color:var(--ink-400);font-size:12px">저장된 함수 없음 (아래에서 저장)</span>';
+ c.innerHTML=h;}
+function payloadToBlock(p){if(p==='grip')return newBlock('grip');if(p==='measure')return newBlock('measure');
+ if(p==='movel')return newBlock('movel');if(p==='movej1')return newBlock('movej1');
+ if(p==='order')return newBlock('order');if(p==='pack')return newBlock('pack');
+ if(p==='wait')return newBlock('wait');if(p==='loop')return newBlock('loop');if(p==='if')return newBlock('if');
+ if(p==='move')return newBlock('move',{id:-1});
+ if(p.indexOf('move:')===0)return newBlock('move',{id:+p.slice(5)});
+ if(p.indexOf('call:')===0)return newBlock('call',{name:decodeURIComponent(p.slice(5))});return null;}
+function pAddNew(p){const b=payloadToBlock(p);if(b){window.PROG.push(b);renderProg();}}
+/* 드래그 (팔레트→추가 / 블록→이동) + 드롭존 */
+function dragNew(e,p){e.dataTransfer.setData('text/plain','new:'+p);}
+function dragMove(e,lp,idx){e.dataTransfer.setData('text/plain','mv:'+lp+'@'+idx);e.stopPropagation();}
+function dropZone(e,lp,idx){e.preventDefault();e.stopPropagation();const d=e.dataTransfer.getData('text/plain')||'';const tgt=resolveList(lp);if(!tgt)return;
+ if(d.indexOf('new:')===0){const b=payloadToBlock(d.slice(4));if(b)tgt.splice(idx,0,b);}
+ else if(d.indexOf('mv:')===0){const s=d.slice(3),at=s.lastIndexOf('@'),slp=s.slice(0,at),sidx=+s.slice(at+1);
+   const selfPath=(slp?slp+'.':'')+sidx;
+   if(lp===selfPath||lp.indexOf(selfPath+'.')===0){renderProg();return;}   /* 자기 자신 안으로 금지 */
+   const src=resolveList(slp);if(!src)return;const node=src[sidx];src.splice(sidx,1);
+   let ti=idx;if(slp===lp&&sidx<idx)ti--;tgt.splice(ti,0,node);}
+ renderProg();}
+function pDelPath(lp,idx){const l=resolveList(lp);if(l)l.splice(idx,1);renderProg();}
+function pDup(lp,idx){const l=resolveList(lp);if(l)l.splice(idx+1,0,JSON.parse(JSON.stringify(l[idx])));renderProg();}
+/* 파라미터 세터 */
+function pSetId(lp,idx,v){const n=nodeAt(lp,idx);if(n)n.id=+v;renderProg();}
+function pRadP(lp,idx,v){const n=nodeAt(lp,idx);if(n){n.radius=Math.max(0,Math.min(60,+v||0));drawRadius(n.radius);}}
+function pSyncP(lp,idx){const n=nodeAt(lp,idx);if(n){n.sync=(n.sync===0)?1:0;renderProg();}}
+function pWidthP(lp,idx,v,eid){const n=nodeAt(lp,idx);if(n)n.width=+v;const e=el(eid);if(e)e.textContent=v;}
+function pForceP(lp,idx,v){const n=nodeAt(lp,idx);if(n)n.force=Math.max(0,Math.min(40,+v||0));}
+function pCountP(lp,idx,v){const n=nodeAt(lp,idx);if(n)n.count=Math.max(1,Math.min(99,+v||1));}
+function pSecP(lp,idx,v){const n=nodeAt(lp,idx);if(n)n.sec=Math.max(0,Math.min(60,+v||0));}
+function pTermP(lp,idx,tm){const n=nodeAt(lp,idx);if(!n)return;if(!n.cond)n.cond={op:'or',terms:[]};const i=n.cond.terms.indexOf(tm);if(i<0)n.cond.terms.push(tm);else n.cond.terms.splice(i,1);renderProg();}
+function pItemP(lp,idx,v){const n=nodeAt(lp,idx);if(n)n.item=v;}
+function pAxP(lp,idx,v){const n=nodeAt(lp,idx);if(n)n.ax=+v;renderProg();}
+function pDP(lp,idx,v){const n=nodeAt(lp,idx);if(n)n.d=+v||0;}
+function pJP(lp,idx,v){const n=nodeAt(lp,idx);if(n)n.j=+v;}
+function pDegP(lp,idx,v){const n=nodeAt(lp,idx);if(n)n.deg=+v||0;}
+function pLoopMode(lp,idx){const n=nodeAt(lp,idx);if(n){n.mode=(n.mode==='order')?'count':'order';renderProg();}}
+function pOpP(lp,idx){const n=nodeAt(lp,idx);if(n&&n.cond){n.cond.op=(n.cond.op==='and')?'or':'and';renderProg();}}
+/* 렌더 (재귀 C-블록) */
+function dz(lp,idx){return `<div class="dz" ondragover="event.preventDefault();this.classList.add('dzon')" ondragleave="this.classList.remove('dzon')" ondrop="this.classList.remove('dzon');dropZone(event,'${lp}',${idx})"></div>`;}
+function renderList(list,lp){let h=dz(lp,0);list.forEach((b,i)=>{h+=renderBlock(b,lp,i)+dz(lp,i+1);});return `<div class="clist">${h}</div>`;}
+function ctrls(lp,idx){return `<span draggable="true" ondragstart="dragMove(event,'${lp}',${idx})" style="cursor:grab;font-weight:800">⋮⋮</span>`;}
+function tailbtns(lp,idx){return `<button class="blkbtn" title="복사" onclick="pDup('${lp}',${idx})">⧉</button><button class="blkbtn" title="삭제" onclick="pDelPath('${lp}',${idx})">✕</button>`;}
+function renderBlock(b,lp,idx){const c=ctrls(lp,idx),tb=tailbtns(lp,idx);
+ const box=(col,inner)=>`<div class="blk" style="background:${col}">${c}${inner}${tb}</div>`;
+ if(b.t==='move'){const wps=window.WPS||[];
+  const opts=`<option value="-1" ${b.id<0?'selected':''}>🏠 홈</option>`+wps.map((w,i)=>`<option value="${i}" ${b.id===i?'selected':''}>P${i+1} ${w.name||''}</option>`).join('');
+  return box(BCOL.move,`<b style="font-weight:800">📍 이동</b><select onchange="pSetId('${lp}',${idx},this.value)">${opts}</select>
+   <span style="flex:1"></span><label style="font-size:11px;font-weight:700">r<input type="number" min="0" max="60" value="${b.radius||0}" onchange="pRadP('${lp}',${idx},this.value)" style="width:40px"></label>
+   <button class="blkbtn" style="background:rgba(255,255,255,.25)" onclick="pSyncP('${lp}',${idx})">${b.sync===0?'≈비동기':'■동기'}</button>`);}
+ if(b.t==='grip'){const eid='w_'+lp.replace(/\./g,'_')+'_'+idx;
+  return box(BCOL.grip,`<b style="font-weight:800">✊</b><span style="font-size:10px;font-weight:700;opacity:.8">닫힘</span>
+   <input type="range" min="0" max="110" value="${b.width}" oninput="pWidthP('${lp}',${idx},this.value,'${eid}')" style="flex:1">
+   <span style="font-size:10px;font-weight:700;opacity:.8">열림</span><b style="font-weight:800;min-width:40px"><span id="${eid}">${b.width}</span>mm</b>
+   <label style="font-size:11px;font-weight:700">힘<input type="number" min="0" max="40" value="${b.force}" onchange="pForceP('${lp}',${idx},this.value)" style="width:38px"></label>`);}
+ if(b.t==='movel')return box(BCOL.movel,`<b style="font-weight:800">🧭 베이스축</b>
+   <select onchange="pAxP('${lp}',${idx},this.value)">${AXN.map((a,i)=>`<option value="${i}" ${b.ax===i?'selected':''}>${a}</option>`).join('')}</select>
+   <input type="number" step="1" value="${b.d}" onchange="pDP('${lp}',${idx},this.value)" style="width:58px"><b style="font-weight:800">${b.ax<3?'mm':'°'}</b><span style="flex:1"></span>`);
+ if(b.t==='movej1')return box(BCOL.movej1,`<b style="font-weight:800">🦾 관절</b>
+   <select onchange="pJP('${lp}',${idx},this.value)">${[0,1,2,3,4,5].map(i=>`<option value="${i}" ${b.j===i?'selected':''}>J${i+1}</option>`).join('')}</select>
+   <input type="number" step="1" value="${b.deg}" onchange="pDegP('${lp}',${idx},this.value)" style="width:58px"><b style="font-weight:800">°</b><span style="flex:1"></span>`);
+ if(b.t==='order')return box(BCOL.order,`<b style="font-weight:800">📋 주문</b>
+   <select onchange="pItemP('${lp}',${idx},this.value)">${ORDITEMS.map(it=>`<option ${b.item===it?'selected':''}>${it}</option>`).join('')}</select>
+   <input type="number" min="1" max="99" value="${b.count}" onchange="pCountP('${lp}',${idx},this.value)" style="width:46px"><b style="font-weight:800">개</b><span style="flex:1"></span>`);
+ if(b.t==='pack')return box(BCOL.pack,`<b style="flex:1;font-weight:800">📦 포장 카운트 +1</b>`);
+ if(b.t==='measure')return box(BCOL.measure,`<b style="flex:1;font-weight:800">🔬 판별 (잡고 분류)</b>`);
+ if(b.t==='wait')return box(BCOL.wait,`<b style="font-weight:800">⏱ 대기</b><input type="number" min="0" max="60" step="0.1" value="${b.sec}" onchange="pSecP('${lp}',${idx},this.value)" style="width:52px"><b style="font-weight:800">초</b><span style="flex:1"></span>`);
+ if(b.t==='call')return box(BCOL.call,`<b style="flex:1;font-weight:800">📞 함수 ▶ ${b.name||'?'}</b>`);
+ if(b.t==='loop'){const om=b.mode==='order';
+  return `<div class="cblk" style="background:${BCOL.loop}"><div class="chead">${c}<b>🔁 반복</b><button class="blkbtn" title="횟수/주문 전환" onclick="pLoopMode('${lp}',${idx})">${om?'주문 완료까지':'횟수'}</button>${om?'':`<input type="number" min="1" max="99" value="${b.count}" onchange="pCountP('${lp}',${idx},this.value)" style="width:44px"><b>회</b>`}<span style="flex:1"></span>${tb}</div><div class="cbody">${renderList(b.body,sub(lp,idx,'body'))}</div></div>`;}
+ if(b.t==='if'){const cd=b.cond||{op:'or',terms:[]};
+  const chips=IFTERMS.map(tm=>`<button class="blkbtn" style="${cd.terms.indexOf(tm)>=0?'background:#fff;color:#000':'background:rgba(255,255,255,.22)'}" onclick="pTermP('${lp}',${idx},'${tm}')">${tm}</button>`).join('');
+  return `<div class="cblk" style="background:${BCOL.if}"><div class="chead">${c}<b>❓ 만약</b>${chips}<button class="blkbtn" style="background:rgba(0,0,0,.25)" title="AND/OR" onclick="pOpP('${lp}',${idx})">${cd.op==='and'?'AND':'OR'}</button><span style="flex:1"></span>${tb}</div>
+   <div class="cbody">${renderList(b.then,sub(lp,idx,'then'))}</div>
+   <div class="chead" style="opacity:.9"><b>아니면</b></div>
+   <div class="cbody">${renderList(b.els,sub(lp,idx,'els'))}</div></div>`;}
+ return box('#888',b.t);}
+function renderProg(){const l=el('proglist');if(!l)return;l.innerHTML=window.PROG.length?renderList(window.PROG,''):'<div style="color:var(--ink-400);font-size:13px;padding:16px;border:1px dashed var(--line);text-align:center">팔레트에서 블록을 클릭하거나 여기로 드래그하세요</div>';}
+/* 트리 ↔ 평면(백엔드용) */
+function flatten(list){let o=[];list.forEach(b=>{
+ if(b.t==='loop'){o.push({t:'loop',count:b.count,mode:b.mode||'count'});o=o.concat(flatten(b.body));o.push({t:'endloop'});}
+ else if(b.t==='if'){o.push({t:'if',cond:b.cond});o=o.concat(flatten(b.then));if(b.els&&b.els.length){o.push({t:'else'});o=o.concat(flatten(b.els));}o.push({t:'endif'});}
+ else o.push(b);});return o;}
+function parseTree(flat,i,stops){const nodes=[];while(i<flat.length){const b=flat[i],t=b.t;if(stops.indexOf(t)>=0)return[nodes,i];
+ if(t==='loop'){const r=parseTree(flat,i+1,['endloop']);nodes.push({t:'loop',count:b.count||2,mode:b.mode||'count',body:r[0]});i=r[1]+1;}
+ else if(t==='if'){const r=parseTree(flat,i+1,['else','endif']);let els=[],j=r[1];if(j<flat.length&&flat[j].t==='else'){const r2=parseTree(flat,j+1,['endif']);els=r2[0];j=r2[1];}nodes.push({t:'if',cond:b.cond||{op:'or',terms:[]},then:r[0],els:els});i=j+1;}
+ else if(t==='endloop'||t==='endif'||t==='else'){i++;}
+ else{nodes.push(b);i++;}}return[nodes,i];}
+/* 실행 / 저장 / 불러오기 */
+function progRun(){const flat=flatten(window.PROG);if(!flat.length){toast('블록을 추가하세요');return;}
+ fetch('/api/prog_run?vel='+el('seqvel').value+'&p='+encodeURIComponent(JSON.stringify(flat))).then(r=>r.json()).then(d=>toast(d.ok?('▶ '+d.blocks+'블록 실행'):(d.msg||'실행 실패'))).catch(()=>toast('실행 실패'));}
+function progSave(){const nm=(el('progname').value||'').trim();if(!nm){toast('이름을 입력하세요');return;}const flat=flatten(window.PROG);if(!flat.length){toast('블록이 없습니다');return;}
+ fetch('/api/prog_save?name='+encodeURIComponent(nm)+'&p='+encodeURIComponent(JSON.stringify(flat))).then(r=>r.json()).then(d=>toast(d.ok?('💾 저장: '+d.name):(d.msg||'저장 실패')));}
+function progLoad(nm){fetch('/api/prog_get?name='+encodeURIComponent(nm)).then(r=>r.json()).then(d=>{if(d.ok){window.PROG=parseTree(d.blocks,0,[])[0];el('progname').value=nm;renderProg();el('progview').textContent=d.text;toast('불러옴: '+nm);}});}
+function progViewOnly(nm){fetch('/api/prog_get?name='+encodeURIComponent(nm)).then(r=>r.json()).then(d=>{if(d.ok)el('progview').textContent=d.text;});}
+function progRunSaved(nm){fetch('/api/prog_run_saved?name='+encodeURIComponent(nm)+'&vel='+el('seqvel').value).then(r=>r.json()).then(d=>toast(d.ok?('▶ '+nm):'실패'));}
+function progDel(nm){if(!confirm(nm+' 삭제?'))return;fetch('/api/prog_delete?name='+encodeURIComponent(nm)).then(()=>toast('삭제됨'));}
+function renderSaved(names){const s=el('savedprogs');if(!s)return;
+ if(!names||!names.length){s.innerHTML='<span style="color:var(--ink-400);font-size:13px">저장된 시퀀스 없음</span>';return;}
+ s.innerHTML=names.map(nm=>`<div style="display:flex;align-items:center;gap:5px;padding:5px 6px;margin-bottom:4px;background:var(--surface-2);border:1px solid var(--line)">
+  <b style="flex:1;font-weight:800">${nm}</b>
+  <button class="btn sm" style="padding:2px 7px;font-weight:800;color:var(--volt);border-color:var(--volt)" onclick="progRunSaved('${nm}')">▶</button>
+  <button class="btn sm" style="padding:2px 6px;font-weight:700" onclick="progLoad('${nm}')">불러오기</button>
+  <button class="btn sm" style="padding:2px 6px;font-weight:700" onclick="progViewOnly('${nm}')">보기</button>
+  <button class="btn sm" style="padding:2px 6px;font-weight:700;color:#f87171" onclick="progDel('${nm}')">✕</button></div>`).join('');}
+/* radius 시각화 (호=코너 통과, sweep 수정) */
+function drawRadius(r){r=+r||0;const s=el('radviz');if(!s)return;const rv=el('radval');if(rv)rv.textContent=r+'mm';const rs=el('radslider');if(rs&&+rs.value!==r)rs.value=r;
+ const cx=160,cy=120,rr=Math.min(100,r*1.7),A={x:26,y:120},C={x:160,y:20},t1={x:cx-rr,y:cy},t2={x:cx,y:cy-rr};
+ const arc=rr>0?`M ${A.x} ${A.y} L ${t1.x} ${t1.y} A ${rr} ${rr} 0 0 0 ${t2.x} ${t2.y} L ${C.x} ${C.y}`:`M ${A.x} ${A.y} L ${cx} ${cy} L ${C.x} ${C.y}`;
+ s.innerHTML=`<path d="M ${A.x} ${A.y} L ${cx} ${cy} L ${C.x} ${C.y}" fill="none" stroke="#cfd4dd" stroke-width="1.4" stroke-dasharray="4 4"/>
+  <path d="${arc}" fill="none" stroke="#7c5cff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="${A.x}" cy="${A.y}" r="3" fill="#9aa0aa"/><circle cx="${C.x}" cy="${C.y}" r="3" fill="#9aa0aa"/>
+  <circle cx="${cx}" cy="${cy}" r="3" fill="#c0c4cc"/>
+  <text x="8" y="150" font-size="10" fill="#8a8a86" font-family="monospace">점선=각진 정지(동기) · 보라=radius ${r} 통과호(비동기)</text>`;}
+drawRadius(20);
+let jogBuilt=false,lastPosj=null;
+function buildJog(posj){
+ el('jogsliders').innerHTML=posj.map((v,i)=>`<div class="slrow">
+  <div class="lab"><span>J${i+1} (°)</span><b id="jv${i}">${v.toFixed(1)}</b></div>
+  <input type="range" id="js${i}" min="-180" max="180" step="1" value="${Math.round(v)}"
+   oninput="el('jv${i}').textContent=this.value" onchange="jogTo(${i},this.value)"></div>`).join('');
+ jogBuilt=true}
+
+function render(d){
+ const rb=d.robot||{},cy=d.cycle||{};
+ /* header state */
+ const noball=cy.msg&&cy.msg.includes('공이 없습니다');
+ const abn=cy.msg&&(cy.msg.startsWith('⚠️')||noball);
+ el('banner').style.display=abn?'flex':'none';
+ if(abn){el('bannermsg').textContent=cy.msg;
+  el('banner').style.background=noball?'var(--warning-soft)':'var(--danger-soft)';
+  el('banner').style.borderColor=noball?'var(--warning)':'var(--danger)';}
+ const servoOn=rb.servo_on===true||(rb.servo_on==null&&rb.connected);
+ el('hstate').className='spill inv '+(abn?'danger':servoOn?'ok':'idle');
+ el('hstatel').textContent=abn?'보호정지':(!rb.connected?'미연결':servoOn?'서보 ON':'서보 OFF');
+ const stog=el('servo_toggle'),stlab=el('servo_toggle_label');
+ if(stog&&document.activeElement!==stog)stog.checked=servoOn;
+ if(stog)stog.disabled=!rb.connected;
+ if(stlab)stlab.textContent=!rb.connected?'서보 미연결':servoOn?'서보 ON':'서보 OFF';
+ /* detect banner */
+ const det=!!d.grip;
+ el('detect').style.background=det?'var(--ink-900)':'#fff';
+ el('detect').style.borderColor=det?'var(--volt)':'var(--line)';
+ el('detpill').className='spill '+(det?'ok inv':'idle');
+ el('detlab').textContent=det?'물체 감지됨':'물체 없음 · 감지 대기';
+ el('detw').textContent='그리퍼 폭 '+(d.actual!=null?d.actual+'mm':'—')+(det?' · 파지 중':'');
+ el('detw').style.color=det?'var(--on-ink-muted)':'var(--ink-400)';
+ /* classification hero */
+ const k=kindOf(cy.flow_class||((d.measure_result||{})['class']||''));
+ const comp=cy.flow_comp!=null?cy.flow_comp:((d.measure_result||{}).compression);
+ el('clspanel').classList.toggle('complete-mode',!!cy.batch_completed);
+ if(!cy.batch_completed)el('clspanel').style.borderColor='var(--line)';
+ if(cy.batch_completed){
+  el('clstitle').textContent='포장 완료 개요';
+  el('clstag').innerHTML='<span class="tag" style="background:var(--success);color:#fff">✓ 무게 검증 완료</span>';
+  el('clspanel').style.borderColor='var(--success)';
+  el('clsbody').innerHTML=completionHtml(cy);
+ }else if(k&&k[0]){
+  el('clstitle').textContent='판별 결과';
+  const kc=k[4]||'#8b949e';                      // 판정별 고유색(그리퍼 탭과 동일)
+  const tone=kc;
+  el('clstag').innerHTML=`<span class="tag" style="background:${kc};color:#fff">→ ${k[3]}</span>`;
+  el('clspanel').style.borderColor=kc;
+  const isBB=(k[0]==='hard'||k[0]==='soft2'),TH=window.__TH||{};
+  const hdr=isBB?'야구공 · 강성 판정':'테니스공 · 공기압 판정';
+  const cf=cy.flow_contact_force!=null?cy.flow_contact_force:((d.measure_result||{}).contact_f||5);
+  const hint=isBB?(TH.baseball?`기준 하드 ≤${TH.baseball.hard_max} · 초과 소프트`:'')
+    :(TH.tennis?`기준 무압 ≤${TH.tennis.nopress_max} · 유압 ≤${TH.tennis.normal_max} · 초과 구멍`:'');
+  el('clsbody').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center">
+   <div><div class="kicker" style="margin-bottom:6px">${hdr}</div>
+    <div style="font-family:var(--font-display);font-style:italic;font-weight:900;font-size:60px;line-height:.85;letter-spacing:-.02em;color:${tone};margin-bottom:0">${k[1]}</div>
+    <div style="font-size:12.5px;color:var(--ink-500);margin-top:20px;margin-bottom:22px">총눌림 ${comp!=null?comp+'mm':'—'} · ${cf}N 접촉 → 40N 강성</div>
+    <div style="display:inline-flex;align-items:center;gap:12px;border:2px solid var(--ink-900);padding:10px 14px">
+     <span style="font-family:var(--font-display);font-style:italic;font-weight:900;font-size:22px">COMP ${comp!=null?comp:'—'}</span>
+     <span class="mono" style="font-size:11px;color:var(--ink-400)">mm · ${hint}</span></div></div>
+   <div style="border:1px solid var(--line);padding:8px"><svg id="curve2" viewBox="0 0 420 190" width="100%" height="170"></svg></div></div>`;
+  const c1=el('curve'),c2=el('curve2');if(c2&&c1)c2.innerHTML=c1.innerHTML;
+ }
+ /* overview cells */
+ el('objtag').innerHTML=det?'<span class="tag volt">● 물체 감지</span>':'<span class="tag muted">○ 물체 없음</span>';
+ el('objtag2').firstElementChild.outerHTML=det?'<span class="tag volt">● 물체 감지</span>':'<span class="tag muted">○ 물체 없음</span>';
+ el('griptag').innerHTML=det?'<span class="tag volt">파지 중</span>':'<span class="tag muted">개방</span>';
+ el('wtext').textContent=(d.actual!=null?d.actual:'—')+' / 110 mm';
+ el('wbar').style.width=(d.actual!=null?Math.min(100,d.actual/110*100):0)+'%';
+ el('v_force').textContent=d.force!=null?d.force:'—';
+ const tf=rb.tool_force;const tfm=tf?Math.hypot(tf[0],tf[1],tf[2]).toFixed(1):'—';
+ el('v_tf').textContent=tfm;el('v_tf2').textContent=tfm;
+ el('p_robot').className='spill '+(rb.connected?'ok':'idle');
+ el('p_robot_d').textContent=rb.connected?(rb.state_name||'연결됨'):'미연결';
+ el('p_grip').className='spill '+(d.connected?'ok':'idle');
+ el('p_grip_d').textContent=d.connected?'Modbus 502':'미연결';
+ el('v_wt').textContent=rb.weight_total!=null?rb.weight_total:'—';
+ el('v_wt2').textContent=rb.weight_total!=null?rb.weight_total:'—';
+ el('objw').innerHTML='<div class="l">물체 무게 (Fz 영점)</div>'+(rb.weight_est!=null?`<div class="v">${rb.weight_est} <span class="u">kg</span></div>`:'<div class="v" style="color:#8a5a00;font-size:16px">영점 필요</div>');
+ /* flows + cycle */
+ const done=!!cy.batch_completed;
+ const fh=flowHtml(cy,done);
+ el('flow1').innerHTML=fh;el('flow2').innerHTML=fh;
+ renderOrderList(cy);
+ el('cyclemsg').textContent=cy.msg||'대기 중';
+ const bt=cy.batch_target||1,bp=cy.batch_packed||0,bl2=el('batchlab');
+ if(bl2){if(bt>1||cy.active){bl2.style.display='inline-flex';bl2.textContent='📦 '+bp+'/'+bt}else bl2.style.display='none'}
+ /* 주문(원격)으로 배치가 돌면 '목표 포장' 입력칸에도 그 수량을 표시 */
+ const wc=el('wcount');if(wc&&cy.active&&document.activeElement!==wc&&String(bt)!==wc.value)wc.value=bt;
+ el('cyctag').innerHTML=done?'<span class="tag volt">포장 완료</span>':cy.active?'<span class="tag volt">진행 중</span>':'<span class="tag outline">대기</span>';
+ /* gripper tab */
+ el('gconn').className='spill '+(d.connected?'ok':'danger');
+ el('gwidth').textContent='폭 '+(d.actual!=null?d.actual+'mm':'—');
+ el('mtag').innerHTML=k&&k[0]?`<span class="tag" style="background:${k[4]||'#8b949e'};color:#fff">${k[1]}</span>`:'';
+ const mr=d.measure_result;
+ if(d.thresholds)window.__TH=d.thresholds;
+ el('mnote').textContent=mr?`접촉 ${mr.size}mm → 40N ${mr.w40}mm · 눌림 ${mr.compression}mm · 크립 ${mr.creep!=null?mr.creep:'—'}mm · ${(mr['class']||'')}`:(d.measure_msg||'측정 없음');
+ const curCol=colorOf((mr&&mr['class'])||cy.flow_class||'');
+ drawCurve(mr,curCol);const c1=el('curve'),c2b=el('curve2');if(c2b&&c1)c2b.innerHTML=c1.innerHTML;
+ const sv=d.saved||[];el('savedn').textContent=sv.length;
+ drawDist(sv);drawDistBB(sv);drawSizeDist(sv);drawScatter(sv);
+ /* 각 그래프가 어떤 특징 축을 쓰는지 제목에 표시 */
+ {const TH=window.__TH||{},t=TH.tennis||{},b=TH.baseball||{};
+  const a1=el('distax'),a2=el('distaxbb');
+  if(a1)a1.textContent='· '+(FEATNM[t.nopress_by||'comp']||'').replace('(mm)','');
+  if(a2)a2.textContent='· '+(FEATNM[b.by||'comp']||'').replace('(mm)','');}
+ /* 자동판정 정확도 = 저장 라벨을 현재 임계값으로 재분류한 일치율 */
+ {const lab=sv.filter(r=>r.size!=null&&r.comp_total!=null&&(r.label==='유압'||r.label==='구멍'||r.label==='무압'||r.label==='하드'||r.label==='소프트'||r.label==='미검출'));
+  const av=el('accval'),an=el('accnote');
+  if(lab.length){const ok=lab.filter(r=>jsClassify(+r.size,+r.comp_total,window.__TH,r.creep,r.w40)===r.label).length;
+   const pct=Math.round(ok/lab.length*100);if(av)av.textContent=pct;
+   if(an)an.textContent=`라벨 ${lab.length}개 중 ${ok}개 일치 · 현재 임계값 기준`;}
+  else{if(av)av.textContent='—';if(an)an.textContent='라벨을 저장하면 정확도 계산';}}
+ const packLbl=l=>l==='구멍'?'불량':(l==='하드'||l==='소프트')?'정렬':'포장';
+ if(sv.length)el('savedtbl').innerHTML='<table><tr><th>시각</th><th>라벨</th><th style="text-align:right">눌림</th><th style="text-align:right">크립</th><th style="text-align:right">크기</th><th>처리</th></tr>'+
+  sv.slice(-14).reverse().map(r=>`<tr><td class="mono">${r.time}</td><td><span style="color:${colorOf(r.label)};font-weight:700">${r.label}</span></td><td class="mono" style="text-align:right">${r.comp_total}</td><td class="mono" style="text-align:right;color:var(--ink-500)">${r.creep!=null?r.creep:'—'}</td><td class="mono" style="text-align:right;color:var(--ink-500)">${r.size!=null?r.size:'—'}</td><td style="font-size:12px">${packLbl(r.label)}</td></tr>`).join('')+'</table>';
+ /* robot tab grids */
+ sgrid('tfgrid',['Fx','Fy','Fz'],tf?tf.slice(0,3):null,'N');
+ sgrid('tmgrid',['Tx','Ty','Tz'],tf?tf.slice(3,6):null,'Nm');
+ sgrid('extgrid',['J1','J2','J3','J4','J5','J6'],rb.ext_torque,'');
+ sgrid('jtgrid',['J1','J2','J3','J4','J5','J6'],rb.joint_torque,'');
+ /* teach tab */
+ const px=rb.posx;
+ sgrid('axgrid',['X','Y','Z','Rx','Ry','Rz'],px, px?['mm','mm','mm','°','°','°']:'');
+ if(!cartBuilt)buildCart();                         // 버튼은 posx 없어도 항상 생성(상대이동)
+ CAX.forEach((a,i)=>{const e=el('cv'+i);if(e)e.textContent=(px&&px.length===6)?px[i].toFixed(1)+a[1]:'상대';});
+ if(rb.posj){lastPosj=rb.posj;
+  if(!jogBuilt)buildJog(rb.posj);
+  else rb.posj.forEach((v,i)=>{const s=el('js'+i);if(s&&document.activeElement!==s){s.value=Math.round(v);el('jv'+i).textContent=v.toFixed(1)}})}
+ spSync(d.speed,d.moves);                           // 속도 탭 슬라이더 동기화(이동별)
+ /* ▶이동 재현 진행상황 실시간 표시 */
+ {const sm=el('spmsg'),cm=cy.msg||'';
+  if(sm&&(cm.startsWith('▶')||cm.startsWith('🗑')||cm.startsWith('✅ ')&&cm.includes('재현')||cm.startsWith('⚠️ 이동 테스트')||cm.startsWith('⚠️ 폐기물')))sm.textContent=cm;}
+ /* 속도탭 주문 테스트 상태 = 실제 사이클 상태 반영 */
+ {const tt=el('sptest_tag'),ts=el('sptest_stat');
+  if(tt)tt.innerHTML=cy.active?'<span class="tag volt">진행 중</span>':(done?'<span class="tag volt">완료</span>':'<span class="tag outline">대기</span>');
+  if(ts&&cy.active){const rem=cy.order_remaining||{};
+   const rt=Object.keys(rem).filter(s=>rem[s]>0).map(s=>spLabel(s)+' '+rem[s]).join(' · ');
+   ts.textContent='▶ '+(cy.msg||'')+'  ['+bp+'/'+bt+']'+(rt?('  남음: '+rt):'');}}
+ const rg=d.regs||[];
+ el('regs').innerHTML=rg.map((v,i)=>`<div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:3px 2px"><span style="color:var(--ink-400)">${i}</span><b>${v}</b></div>`).join('');
+ const wps=d.waypoints||[];window.WPS=wps;el('wpn').textContent=wps.length;
+ window.PROGS=d.programs||[];renderPalette();renderSaved(window.PROGS);
+ const pg=d.prog;const ods=d.orders||[];const ps=el('progstat');
+ const ordtxt=ods.length?('   📋 '+ods.map(o=>o.item+' '+o.packed+'/'+o.count).join(' · ')):'';
+ if(ps)ps.textContent=((pg&&pg.active)?('▶ 실행 중 '+pg.step+'/'+pg.total+'  ['+(pg.msg||'')+']'):'')+ordtxt;
+ el('wptbl').innerHTML=wps.length?'<table><tr><th>#</th><th>이름</th><th>관절 J1~J6 (°)</th><th>그리퍼</th><th>역할</th><th></th></tr>'+
+  wps.map((w,i)=>`<tr><td class="mono" style="font-weight:900">${i+1}</td>
+   <td><a class="lnk" onclick="wpEdit(${i},'name')">${w.name||'-'}</a></td>
+   <td class="mono" style="font-size:11.5px">[${w.posj.map(v=>v.toFixed(1)).join(', ')}]</td>
+   <td class="mono">${w.gripper}mm</td>
+   <td><select onchange="wpRole(${i},this.value)">${Object.keys(ROLES).map(r=>`<option value="${r}"${(w.role||'')===r?' selected':''}>${ROLES[r]}</option>`).join('')}</select></td>
+   <td style="white-space:nowrap"><a class="lnk" onclick="wpGoto(${i})">▶ 이동</a> <a class="del" onclick="if(confirm('삭제?'))api('/api/wp_delete?i=${i}')">✕</a></td></tr>`).join('')+'</table>'
+  :'<span style="color:var(--ink-400);font-size:13px">저장된 포인트 없음 — 자세 잡고 📍 저장</span>';
+}
+/* ══ 속도 탭 — 웨이포인트 이동별 ══ */
+// config.FLOW_MOVES 미러(즉시 표시용). 서버 move_defs가 오면 값만 동기화.
+const SPMOVES=[
+ {k:'ord_enter',    flow:'주문 파지',label:'P5 허브 진입',      edge:'→P5',           def:30,unit:'°/s'},
+ {k:'ord_to_lift',  flow:'주문 파지',label:'잡는위치 위 경유',   edge:'P5→P2/P4',      def:30,unit:'°/s'},
+ {k:'ord_descend',  flow:'주문 파지',label:'슬롯으로 하강(파지)', edge:'P2/P4→P20/P3',  def:24,unit:'°/s'},
+ {k:'ord_extract',  flow:'주문 파지',label:'공 빼내기(40N)',    edge:'P20/P3→P2/P4',  def:20,unit:'°/s'},
+ {k:'ord_carry_hub',flow:'주문 파지',label:'허브로 운반',       edge:'P2/P4→P5',      def:16,unit:'°/s'},
+ {k:'ord_carry_via',flow:'주문 파지',label:'보충 경유지로',     edge:'P5→P13/P15',    def:16,unit:'°/s'},
+ {k:'ord_place',    flow:'주문 파지',label:'놓는 위치로 하강',   edge:'→P6/P7/P14/P16',def:12,unit:'°/s'},
+ {k:'ord_return',   flow:'주문 파지',label:'P5로 복귀',        edge:'→P5',           def:30,unit:'°/s'},
+ {k:'lidopen_travel', flow:'뚜껑 열기',label:'뚜껑 일반 이송',   edge:'P5·P12·P9',     def:12,unit:'°/s'},
+ {k:'lidopen_near',   flow:'뚜껑 열기',label:'뚜껑 정밀 접근·이탈',edge:'P10/P8 근처',   def:8, unit:'°/s'},
+ {k:'lidclose_travel',flow:'뚜껑 닫기',label:'뚜껑 일반 이송',   edge:'P5·P9·P12',     def:12,unit:'°/s'},
+ {k:'lidclose_near',  flow:'뚜껑 닫기',label:'뚜껑 정밀 접근',   edge:'P8 근처',       def:10,unit:'°/s'},
+ {k:'waste_travel',   flow:'폐기물 처리',label:'폐기물 일반 이송', edge:'P5·P25·P28',   def:60,unit:'°/s'},
+ {k:'waste_near',     flow:'폐기물 처리',label:'폐기통 접근·이탈', edge:'P25→P26',      def:60,unit:'°/s'},
+ {k:'waste_carry',    flow:'폐기물 처리',label:'폐기통 운반',     edge:'P27→P28→P29',  def:60,unit:'°/s'},
+ {k:'waste_dump',     flow:'폐기물 처리',label:'비우기(기울임)',  edge:'P29→P30',      def:60,unit:'°/s'},
+ {k:'lid_comp_descend',flow:'뚜껑 닫기',label:'순응 하강(안착)', edge:'P12→P10',       def:8, unit:'mm/s',nt:1},
+ {k:'lid_comp_rotate',flow:'뚜껑 닫기',label:'회전 잠금',       edge:'P10→P11',       def:12,unit:'°/s'},
+ {k:'lid_box_lift',   flow:'뚜껑 닫기',label:'통 들기/내리기(Z)',edge:'±Z 100mm',      def:20,unit:'mm/s',nt:1},
+];
+const SPFLOWS=['주문 파지','뚜껑 열기','뚜껑 닫기','폐기물 처리'];
+let spBuilt=false;
+const spDirty=new Set();      // 사용자가 만졌지만 아직 [적용]하지 않은 슬라이더
+function spMark(k){spDirty.add(k);const t=el('sptag');
+ if(t){t.className='tag warning';t.textContent='● 미적용 변경 '+spDirty.size+'개';}}
+function spBuild(){
+ let h='';
+ SPFLOWS.forEach(fl=>{
+  h+=`<div style="font-size:11px;font-weight:900;letter-spacing:.04em;color:var(--volt-ink,var(--ink-900));background:var(--surface-2);padding:5px 8px;margin:10px 0 8px">${fl}</div>`;
+  SPMOVES.filter(m=>m.flow===fl).forEach(m=>{
+   const btn=m.nt?`<span style="font-size:10px;color:var(--ink-400)" title="순응제어 구간이라 단독 재현 불가">순응</span>`
+                 :`<a class="lnk" style="font-size:11px;cursor:pointer" onclick="spTest('${m.k}')">▶ 이동</a>`;
+   h+=`<div class="slrow"><div class="lab"><span>${m.label} <span style="color:var(--ink-400);font-weight:600">· ${m.edge}</span></span>
+     <span style="display:flex;align-items:center;gap:8px">${btn}<b id="sp_${m.k}_v">${m.def}</b> ${m.unit}</span></div>
+    <input type="range" id="sp_${m.k}" min="1" max="60" step="1" value="${m.def}" oninput="el('sp_${m.k}_v').textContent=this.value;spMark('${m.k}')"></div>`;
+  });
+ });
+ el('spmoves').innerHTML=h;
+ const t=el('sptag');if(t){t.className='tag outline';t.textContent='기본값 표시 중';}
+ spBuilt=true;
+}
+function spSync(sp,moves){   // 서버값 → 슬라이더. ★적용 안 한 변경(dirty)은 절대 덮어쓰지 않는다.
+ if(!spBuilt)spBuild();          //   (안 그러면 슬라이더 B를 만지는 순간 A가 옛 서버값으로 되돌아감)
+ if(moves)SPMOVES.forEach(m=>{const e=el('sp_'+m.k),v=moves[m.k];
+   if(e&&!spDirty.has(m.k)&&document.activeElement!==e&&v!=null){
+     e.value=Math.round(v);el('sp_'+m.k+'_v').textContent=Math.round(v);}});
+ const op=el('sp_op');
+ if(op&&!spDirty.has('op_speed')&&document.activeElement!==op&&sp&&sp.op_speed!=null){
+   op.value=sp.op_speed;el('sp_op_v').textContent=sp.op_speed;}
+ const t=el('sptag');
+ if(t&&spDirty.size){t.className='tag warning';t.textContent='● 미적용 변경 '+spDirty.size+'개';}
+ else if(t&&moves){t.className='tag ok';t.textContent='적용됨 · 배속 '+((sp&&sp.op_speed)||100)+'%';}
+}
+async function spApply(){
+ const q=SPMOVES.map(m=>m.k+'='+el('sp_'+m.k).value).join('&')+'&op_speed='+el('sp_op').value;
+ el('spmsg').textContent='적용 중…';
+ try{const r=await fetch('/api/set_speed?'+q);const d=await r.json();
+  if(d.ok){spDirty.clear();                       // 서버가 받았으니 이제 폴링 동기화 허용
+   if(d.moves)spSync({op_speed:d.op_speed},d.moves);
+   el('spmsg').textContent='✔ 적용·저장 완료 — 다음 주문/실행부터 이 속도로 이동합니다.';toast('이동 속도 저장됨');}
+  else el('spmsg').textContent='실패: '+(d.msg||'');
+ }catch(e){el('spmsg').textContent='통신 실패: '+e;}
+}
+async function spWaste(){
+ if(!confirm('폐기물 처리를 실행할까요?\n로봇이 P25~P30 경로로 움직입니다.'))return;
+ el('sptest_stat').textContent='🗑 폐기물 처리 요청...';
+ try{const r=await fetch('/api/run_waste');const d=await r.json();
+  el('sptest_stat').textContent=d.msg||'';toast(d.msg||'요청됨');
+ }catch(e){el('sptest_stat').textContent='통신 실패: '+e;}
+}
+async function spTest(k){
+ const m=SPMOVES.find(x=>x.k===k)||{};
+ if(spDirty.has(k)){toast('먼저 [적용·저장]을 눌러주세요');return;}
+ el('spmsg').textContent='▶ '+(m.label||k)+' 재현 요청...';
+ try{const r=await fetch('/api/test_move?key='+encodeURIComponent(k));const d=await r.json();
+  if(d.ok){el('spmsg').textContent='▶ '+d.msg+(d.staged?' (출발점 먼저 이동)':'');toast('이동 재현 시작');}
+  else{el('spmsg').textContent='실패: '+(d.msg||'');toast(d.msg||'실패',2600);}
+ }catch(e){el('spmsg').textContent='통신 실패: '+e;}
+}
+function spReset(){
+ SPMOVES.forEach(m=>{el('sp_'+m.k).value=m.def;el('sp_'+m.k+'_v').textContent=m.def;spMark(m.k);});
+ el('sp_op').value=100;el('sp_op_v').textContent=100;spMark('op_speed');
+ el('spmsg').textContent='기본값으로 되돌림 — [적용·저장]을 눌러야 반영됩니다.';
+}
+/* 주문 테스트 — 장바구니(다품목) */
+const SPSKU=[['tennis_normal','테니스 유압','🟢','테니스 슬롯'],['tennis_nopress','테니스 무압','🔵','테니스 슬롯'],
+             ['baseball_hard','야구 하드','🟡','야구 슬롯'],['baseball_soft','야구 소프트','🟠','야구 슬롯']];
+/* 패키지(= 포장 튜브 1개 = 뚜껑 1사이클)당 공 최대 3개. 종류는 섞여도 된다.
+   4개 이상 주문하면 패키지가 여러 개가 되고, 패키지마다 배치를 하나씩 순차 실행한다
+   (뚜껑 열기 → 채우기 → 뚜껑 닫기 를 패키지 수만큼 반복). */
+const SPMAX=3;                              // 패키지 1개당 최대 수량
+let spSku='tennis_normal', spCart=[];       // [[sku,qty,pkg],...] 담은 순서 = 탐색 순서
+let spRunning=false, spAbort=false;
+const spLabel=k=>(SPSKU.find(s=>s[0]===k)||[0,k])[1];
+const spIcon=k=>(SPSKU.find(s=>s[0]===k)||[0,0,''])[2];
+const spTotal=()=>spCart.reduce((a,c)=>a+c[1],0);
+/* 패키지 번호 → 그 패키지에 담긴 항목들 (번호 오름차순) */
+function spPkgMap(){
+ const m=new Map();
+ spCart.forEach((it,i)=>{const p=it[2]||1;if(!m.has(p))m.set(p,[]);m.get(p).push({it,i});});
+ return new Map([...m.entries()].sort((a,b)=>a[0]-b[0]));
+}
+const spPkgQty=p=>spCart.filter(c=>(c[2]||1)===p).reduce((a,c)=>a+c[1],0);
+/* '자동'으로 담을 때: 자리가 남은 가장 앞 패키지, 없으면 새 패키지 */
+function spAutoPkg(qty){
+ const m=spPkgMap();
+ for(const p of m.keys()) if(spPkgQty(p)+qty<=SPMAX) return p;
+ return (m.size?Math.max(...m.keys()):0)+1;
+}
+/* 패키지 선택 드롭다운 = 현재 패키지들 + '새 패키지' */
+function spSyncPkgSelect(){
+ const s=el('sptest_pkg');if(!s)return;
+ const cur=s.value, ps=[...spPkgMap().keys()];
+ const next=(ps.length?Math.max(...ps):0)+1;
+ s.innerHTML='<option value="0">자동</option>'
+  +ps.map(p=>`<option value="${p}">패키지 ${p} (${spPkgQty(p)}/${SPMAX})</option>`).join('')
+  +`<option value="${next}">+ 새 패키지 ${next}</option>`;
+ if([...s.options].some(o=>o.value===cur))s.value=cur;
+}
+function spBuildSku(){
+ el('sptest_sku').innerHTML=SPSKU.map(s=>
+  `<button class="btn sm" id="spsku_${s[0]}" onclick="spPickSku('${s[0]}')" style="font-weight:800">${s[2]} ${s[1]}</button>`).join('');
+ spPickSku(spSku);spCartRender();
+}
+function spPickSku(k){spSku=k;SPSKU.forEach(s=>{const b=el('spsku_'+s[0]);
+  if(b)b.classList.toggle('primary',s[0]===k);});}
+function spCartRender(){
+ const m=spPkgMap(), tot=spTotal(), te=el('spcart_tot');
+ if(te){te.textContent=tot?`${tot}개 · 패키지 ${m.size}개`:'0개';
+  te.style.color=tot?'var(--ink-900)':'var(--ink-400)';}
+ spSyncPkgSelect();
+ const c=el('spcart');if(!c)return;
+ if(!spCart.length){c.innerHTML='<span style="color:var(--ink-400);font-size:12px">'
+  +'품목을 담아주세요 · 패키지 하나에 최대 3개, 4개 이상이면 자동으로 나뉩니다</span>';return;}
+ const pkgs=[...m.entries()];
+ c.innerHTML=pkgs.map(([p,rows],pi)=>{
+  const q=spPkgQty(p), over=q>SPMAX;
+  return `<div style="${pi?'margin-top:8px;':''}border:1px solid ${over?'var(--danger)':'var(--line)'};padding:6px 8px">
+   <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:800;
+        color:${over?'var(--danger)':'var(--ink-400)'};margin-bottom:4px">
+     <span>📦 패키지 ${p}</span><span class="mono">${q}/${SPMAX}${over?' 초과!':''}</span></div>
+   ${rows.map(({it,i},ri)=>`
+   <div style="display:flex;align-items:center;gap:6px;padding:3px 0;${ri?'border-top:1px solid var(--line)':''}">
+     <span style="flex:1;font-weight:700;font-size:12.5px">${spIcon(it[0])} ${spLabel(it[0])}</span>
+     <span class="mono" style="font-weight:800">${it[1]}개</span>
+     <select style="width:58px;font-size:11px" onchange="spCartMove(${i},this.value)">
+       ${pkgs.map(([q2])=>`<option value="${q2}"${q2===p?' selected':''}>P${q2}</option>`).join('')}
+       <option value="${Math.max(...m.keys())+1}">P${Math.max(...m.keys())+1}+</option>
+     </select>
+     <a class="del" style="cursor:pointer" onclick="spCartDel(${i})">✕</a>
+    </div>`).join('')}
+  </div>`;}).join('');
+}
+function spCartAdd(){
+ const qty=Math.max(1,Math.min(SPMAX,parseInt(el('sptest_qty').value)||1));
+ const sel=parseInt(el('sptest_pkg').value)||0;
+ const pkg=sel||spAutoPkg(qty);                      // 0 = 자동
+ if(spPkgQty(pkg)+qty>SPMAX){
+  toast(`패키지 ${pkg}는 ${SPMAX}개까지예요 (현재 ${spPkgQty(pkg)}개)`);return;}
+ const ex=spCart.find(c=>c[0]===spSku&&(c[2]||1)===pkg);
+ if(ex)ex[1]+=qty; else spCart.push([spSku,qty,pkg]); // 같은 패키지·같은 품목이면 합산
+ spCartRender();toast(`${spLabel(spSku)} ${qty}개 → 패키지 ${pkg}`);
+}
+/* 항목을 다른 패키지로 옮긴다(수동 지정) */
+function spCartMove(i,p){
+ p=parseInt(p)||1;
+ const it=spCart[i];if(!it)return;
+ if(spPkgQty(p)+it[1]>SPMAX&&(it[2]||1)!==p){
+  toast(`패키지 ${p}에 자리가 없어요`);spCartRender();return;}
+ it[2]=p;
+ const ex=spCart.find((c,j)=>j!==i&&c[0]===it[0]&&(c[2]||1)===p);  // 옮긴 뒤 같은 품목이면 합산
+ if(ex){ex[1]+=it[1];spCart.splice(i,1);}
+ spCartRender();
+}
+function spCartDel(i){spCart.splice(i,1);spRenumber();spCartRender();}
+function spCartClear(){spCart=[];spCartRender();el('sptest_stat').textContent='';}
+/* 중간 패키지가 비면 번호를 1,2,3…으로 다시 촘촘하게 */
+function spRenumber(){
+ const ps=[...new Set(spCart.map(c=>c[2]||1))].sort((a,b)=>a-b);
+ const map=new Map(ps.map((p,i)=>[p,i+1]));
+ spCart.forEach(c=>c[2]=map.get(c[2]||1));
+}
+const spSleep=ms=>new Promise(r=>setTimeout(r,ms));
+const spStatus=async()=>(await (await fetch('/api/status')).json()).cycle||{};
+/* 배치가 시작(active)될 때까지 → 그다음 끝날(!active) 때까지 기다린다.
+   start_work 직후에는 아직 active 가 아니라서 두 단계로 나눠 확인해야 한다. */
+async function spWaitBatch(){
+ let started=false;
+ for(let i=0;i<40;i++){                       // 시작 확인 최대 ~12초
+  if(spAbort)return null;
+  if((await spStatus()).active){started=true;break;}
+  await spSleep(300);
+ }
+ // ★시작을 못 봤으면 실패로 본다. 여기서 바로 종료판정으로 넘어가면 이전 배치의
+ //   batch_completed 가 남아 있어 '움직이지도 않은 패키지'를 성공으로 오인한다.
+ if(!started)return null;
+ for(let i=0;i<4000;i++){                     // 종료 대기 (넉넉히)
+  if(spAbort)return null;
+  const cy=await spStatus();
+  if(!cy.active)return cy;
+  await spSleep(500);
+ }
+ return null;
+}
+async function spOrder(){
+ if(spRunning){toast('이미 실행 중이에요');return;}
+ if(!spCart.length){toast('장바구니가 비었어요');return;}
+ const m=spPkgMap();
+ const over=[...m.keys()].filter(p=>spPkgQty(p)>SPMAX);
+ if(over.length){toast(`패키지 ${over.join(',')}가 ${SPMAX}개를 넘어요`);return;}
+ const pkgs=[...m.entries()];
+ spRunning=true;spAbort=false;
+ const st=el('sptest_stat');
+ try{
+  for(let n=0;n<pkgs.length;n++){
+   if(spAbort){st.textContent=`⏹ 중단됨 (패키지 ${n}/${pkgs.length} 완료)`;break;}
+   const [p,rows]=pkgs[n];
+   const items=rows.map(({it})=>it);
+   const targets=items.map(it=>it[0]+':'+it[1]).join(',');
+   const qty=items.reduce((a,it)=>a+it[1],0);
+   const desc=items.map(it=>spLabel(it[0])+' '+it[1]).join(' · ');
+   st.textContent=`▶ 패키지 ${p} (${n+1}/${pkgs.length}) 전송 중 — ${desc}`;
+   let d;
+   try{d=await (await fetch('/api/start_work?targets='+encodeURIComponent(targets))).json();}
+   catch(e){st.textContent=`통신 실패 (패키지 ${p}): ${e}`;break;}
+   if(!d.ok){st.textContent=`패키지 ${p} 시작 실패: ${d.msg||''}`;break;}
+   toast(`패키지 ${p} 시작 · ${qty}개`);
+   st.textContent=`▶ 패키지 ${p} (${n+1}/${pkgs.length}) 진행 중 — ${desc}`;
+   const cy=await spWaitBatch();
+   if(spAbort){st.textContent=`⏹ 중단됨 (패키지 ${n}/${pkgs.length} 완료)`;break;}
+   if(!cy){st.textContent=`⚠️ 패키지 ${p} 완료 확인 실패 — 다음 패키지 중단`;break;}
+   if(!cy.batch_completed){                    // 공 소진·오류 등 → 뒤 패키지는 자동 진행 안 함
+    st.textContent=`⚠️ 패키지 ${p} 미완료 (${cy.msg||''}) — 남은 ${pkgs.length-n-1}개 패키지 중단`;break;}
+   if(n===pkgs.length-1)
+    st.textContent=`✅ 전체 완료 — 패키지 ${pkgs.length}개 · 공 ${spTotal()}개`;
+  }
+ } finally { spRunning=false; }
+}
+function spStop(){
+ spAbort=true;spRunning=false;
+ api('/api/stop_work');toast('작업 중단');
+ el('sptest_stat').textContent='⏹ 중단 요청됨';
+}
+async function poll(){try{const r=await fetch('/api/status');render(await r.json())}catch(e){
+ el('p_robot').className='spill idle';el('p_grip').className='spill idle'}}
+spBuild();spBuildSku();                    // 서버 응답 없어도 슬라이더·주문버튼 즉시 표시
+setInterval(poll,500);poll();
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# ── 파이썬 ────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ── ROS2 빌드 산출물 (colcon build 로 재생성) ─────────
+palpa_ws/build/
+palpa_ws/install/
+palpa_ws/log/
+
+# ── 런타임 생성물 ─────────────────────────────────────
+palpa_backend/palpa.db          # 주문 DB — 첫 실행 시 자동 생성
+data/sequences_readable.txt     # 시퀀스 텍스트 덤프(사람이 읽는 용도)
+
+# ── 작업 중 백업 ──────────────────────────────────────
+*.bak
+*.bak-*
+*.zip
+
+# ── 에디터 / OS ───────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store

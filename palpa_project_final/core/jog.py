@@ -354,6 +354,38 @@ class JogWorker(threading.Thread):
             return (manual_ok and configured and auto_ok
                     and robot_state() == 1 and motion_status() == 0)
 
+        def recover_from_trip():
+            """외력/충돌 안전정지를 '🛡 로봇 복구' 버튼과 똑같은 절차로 자동 해제한다.
+
+            그 버튼(RobotMonitor._recover_req)이 실기에서 검증됐으므로 순서를 그대로 쓴다:
+            상태별 복구코드 → RESET_RECOVERY → 서보온 → 자율모드 → 서보온 재확인.
+            ROBOT_CONTROL: RESET_SAFE_STOP=2 SERVO_ON=3 RECOVERY_SAFE_STOP=4
+                           RECOVERY_SAFE_OFF=5 RESET_RECOVERY=7
+            STATE: STANDBY=1 SAFE_OFF=3 SAFE_STOP=5 RECOVERY=8 SAFE_STOP2=9 SAFE_OFF2=10
+            ※충돌감도는 건드리지 않는다 — 배치 시작 때 이미 고정했고, 변경은 MANUAL
+              전환이 필요해 복구 흐름을 끊는다.
+            반환: STANDBY+IDLE 로 돌아왔으면 True."""
+            st = robot_state()
+            if st in (5, 9):        # 보호정지(노란불)
+                seq = (4, 7, 3)
+            elif st in (3, 10):     # 서보 꺼짐
+                seq = (5, 7, 3)
+            elif st == 8:           # 이미 복구모드
+                seq = (7, 3)
+            else:
+                seq = (2, 3)
+            for code in seq:
+                call(cctrl, SetRobotControl.Request(robot_control=int(code)), cto=2.0)
+                time.sleep(0.4)
+            ensure_auto()           # movej는 AUTONOMOUS 에서만 허용(아니면 5.7170 거부)
+            call(cctrl, SetRobotControl.Request(robot_control=3), cto=2.0)
+            t0 = time.time()
+            while time.time() - t0 < 8.0:
+                if robot_state() == 1 and motion_status() == 0:
+                    return True
+                time.sleep(0.3)
+            return False
+
         def assert_safe_state(st):
             if st in (3, 5, 8, 9, 10):
                 raise RuntimeError(
@@ -763,6 +795,7 @@ class JogWorker(threading.Thread):
             Float64MultiArray=Float64MultiArray,
             joints=fresh_cycle_joints,
             ensure_auto=ensure_auto,
+            recover_trip=recover_from_trip, last_alarm=last_alarm,
             prepare_collision=prepare_collision_for_motion,
             tool_snapshot=live_tool_snapshot,
             waypoints=wp_snap, state=RT.STATE, motion_active=MOTION_ACTIVE,
@@ -806,6 +839,7 @@ class JogWorker(threading.Thread):
                 self._batch_attempts = 0
                 self.last_cycle_result = {}
                 fails = 0
+                empties = 0   # 연속 '공 없음'(미검출) 횟수 — 2회째에 P5 복귀 후 중단
                 # ★주문 시작 시 전역배속(op_speed)을 저장된 값(기본 100)으로 세팅 → 구간속도 1:1 성립.
                 #   (op<100이면 슬라이더값이 그만큼 깎여서 1:1이 안 됨)
                 try:
@@ -901,11 +935,21 @@ class JogWorker(threading.Thread):
                             self.batch_defect += 1   # 폐기물 처리 실행 여부 판단용
                         if status in ('packed', 'defect', 'rerouted'):
                             fails = 0
+                            empties = 0
                         elif status == 'empty':
-                            batch_outcome = (f'🚨 공이 없습니다! 공을 채워주세요 '
-                                             f'(포장 {self.batch_packed}/{self._batch_target}에서 중단)')
-                            self.cycle_msg = batch_outcome
-                            break
+                            # 미검출은 '판정 불가'와 같은 2회 기준으로 맞춘다.
+                            # 슬롯 한 자리가 비었을 뿐 옆에 공이 있을 수 있어, 한 번은
+                            # P5(전체 경유지)로 빠져나갔다가 새로 접근해 다시 시도한다.
+                            # (run_cycle이 이미 P5까지 복귀시킨 상태로 돌아온다)
+                            empties += 1
+                            if empties >= 2:
+                                batch_outcome = (
+                                    f'🚨 슬롯을 보충해주세요 (미검출 2회 · 포장 '
+                                    f'{self.batch_packed}/{self._batch_target}에서 중단)')
+                                self.cycle_msg = batch_outcome
+                                break
+                            self.cycle_msg = (
+                                f'⚠️ 미검출 1/2 — P5 전체 경유지 복귀 후 다시 접근합니다')
                         elif status == 'stopped':
                             break
                         elif status == 'retry':

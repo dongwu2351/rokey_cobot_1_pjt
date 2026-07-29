@@ -298,5 +298,110 @@
    "radius": 0,
    "sync": 1
   }
+ ],
+ "테니스공 판별 _demo": [
+  {
+   "t": "move",
+   "id": -1,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "grip",
+   "width": 110,
+   "force": 40
+  },
+  {
+   "t": "order",
+   "item": "유압",
+   "count": 1
+  },
+  {
+   "t": "order",
+   "item": "무압",
+   "count": 1
+  },
+  {
+   "t": "loop",
+   "count": 2,
+   "mode": "order"
+  },
+  {
+   "t": "move",
+   "id": 1,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 19,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "measure"
+  },
+  {
+   "t": "if",
+   "cond": {
+    "op": "or",
+    "terms": [
+     "유압",
+     "무압"
+    ]
+   }
+  },
+  {
+   "t": "move",
+   "id": 1,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 4,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 5,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "pack"
+  },
+  {
+   "t": "else"
+  },
+  {
+   "t": "move",
+   "id": 1,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 4,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "move",
+   "id": 6,
+   "radius": 0,
+   "sync": 1
+  },
+  {
+   "t": "endif"
+  },
+  {
+   "t": "endloop"
+  },
+  {
+   "t": "call",
+   "name": "홈부터 뚜껑닫는거까지_1"
+  }
  ]
 }

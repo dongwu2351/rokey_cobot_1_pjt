@@ -18,6 +18,7 @@
 
 ## 목차
 
+0. [작업 흐름 한눈에 보기](#0-작업-흐름-한눈에-보기)
 1. [시스템 아키텍처](#1-시스템-아키텍처)
 2. [노드 구조](#2-노드-구조)
 3. [파일 구조](#3-파일-구조)
@@ -27,6 +28,130 @@
 7. [판정 알고리즘](#7-판정-알고리즘)
 8. [데이터 파일](#8-데이터-파일)
 9. [트러블슈팅](#9-트러블슈팅)
+
+---
+
+## 0. 작업 흐름 한눈에 보기
+
+주문 하나가 들어와서 포장이 끝나기까지의 전체 흐름입니다.
+
+### 0-1. 배치 흐름 — 묶음(포장 튜브) 1개 처리
+
+```mermaid
+flowchart TD
+    S([주문 수신]) --> COL["🛡 충돌감도 고정<br/>MANUAL 전환 → 설정 → AUTONOMOUS 복귀"]
+    COL --> LID1["🧢 뚜껑 열기<br/>P5→P21→P22 파지→P5→P9→P24 내려놓기"]
+    LID1 --> CYC{"공을 하나 처리<br/>(아래 0-2 참조)"}
+    CYC -->|"포장 완료 수 < 목표"| CYC
+    CYC -->|"목표 달성"| LID2["🧢 뚜껑 닫기<br/>P5→P9→P24 파지→P21→순응 안착·회전 잠금"]
+    CYC -->|"3회 시도해도 공 없음"| REFILL["⚠️ 자재 보충 요청<br/>작업자 호출 · 배치 중단"]
+    LID2 --> W["⚖️ 무게 검증<br/>영점 → 재파지 → +100mm → ΔFz/9.81"]
+    W --> WASTE{"이번 배치에<br/>불량이 있었나?"}
+    WASTE -->|예| DUMP["🗑 폐기물 처리<br/>P25→P26 파지→P28→P29→P30 비움→복귀"]
+    WASTE -->|아니오| E([완료])
+    DUMP --> E
+
+    style COL fill:#3d3d1a,color:#fff
+    style W fill:#1a3d2d,color:#fff
+    style REFILL fill:#3d2d1a,color:#fff
+    style DUMP fill:#3d1a3d,color:#fff
+```
+
+> 묶음이 여러 개인 주문은 이 흐름 전체를 **묶음 수만큼 순차 반복**합니다.
+> (묶음 1개 = 포장 튜브 1개 = 뚜껑 1사이클)
+
+### 0-2. 공 1개 처리 사이클 — 판정과 라우팅
+
+```mermaid
+flowchart TD
+    A([사이클 시작]) --> B["① 그리퍼 개방 확인"]
+    B --> C["②③ P5·경유지 무정지 통과<br/>→ 슬롯 진입"]
+    C --> D["④ 공 잡기<br/>5N 저힘 접촉감지"]
+    D --> D2{"접촉<br/>감지?"}
+    D2 -->|미검출| RETRY["재시도<br/>(3회 실패 시 자재 보충 요청)"]
+    RETRY --> C
+    D2 -->|검출| M["⑤ 판정<br/>5N 접촉폭 w5 → 40N 압축폭 w40<br/>comp = w5 − w40"]
+    M --> CLS{"분류"}
+
+    CLS -->|"comp ≤ 3.6"| N1["🔵 무압"]
+    CLS -->|"comp ≤ 5.5"| N2["🟢 유압"]
+    CLS -->|"comp > 5.5"| N3["🔴 구멍 = 불량"]
+    CLS -->|"size ≤ 67.8mm"| N4["🟡 하드 / 🟠 소프트<br/>(야구공)"]
+
+    N1 --> R{"라우팅 결정"}
+    N2 --> R
+    N4 --> R
+    N3 --> P7["⑥⑦⑧ P7 불량함<br/>→ 폐기물 처리 예약"]
+
+    R -->|"주문에 남은 수량 있음"| P6["⑥⑦⑧ P6 포장 위치<br/>→ 포장 카운트 +1"]
+    R -->|"주문에 없는 종류"| RP["⑥⑦⑧ P13~P16<br/>원래 종류 슬롯으로 반납"]
+
+    P6 --> Z["⑨ P5 복귀<br/>(다음 사이클과 무정지 연결)"]
+    P7 --> Z
+    RP --> Z
+    Z --> END([사이클 종료])
+
+    style M fill:#1a2d3d,color:#fff
+    style P6 fill:#1a3d1a,color:#fff
+    style P7 fill:#3d1a1a,color:#fff
+    style RP fill:#3d3d1a,color:#fff
+```
+
+> 분류 경계값(`3.6` / `5.5` / `67.8mm`)은 **실측 데이터로 자동계산된 현재 값**입니다.
+> `data/ball_thresholds.json`에 저장되며 코드 기본값을 덮어씁니다 — 재보정하면 바뀝니다.
+
+### 0-3. 외력 자동복구 — 어느 단계에서든 끼어들 수 있음
+
+```mermaid
+flowchart LR
+    RUN["이동 중"] -->|"사람이 밀면"| T["🛡 보호정지<br/>2초 내 감지"]
+    T --> C{"복구 한도<br/>남았나?"}
+    C -->|예| R["자동 복구<br/>상태별 코드 → 서보ON → AUTO"]
+    C -->|아니오| H["🛑 중단<br/>이동명령 보내지 않음"]
+    R --> OK{"8초 내<br/>STANDBY?"}
+    OK -->|예| RES["🔧 재개<br/>★기억한 구간(at)부터"]
+    OK -->|아니오| H
+    RES --> RUN
+
+    style T fill:#3d3d1a,color:#fff
+    style RES fill:#1a3d1a,color:#fff
+    style H fill:#3d1a1a,color:#fff
+```
+
+> ⛔ **순응제어 구간(뚜껑 안착)만 예외** — 안전정지로 순응이 풀린 뒤 재이동하면
+> 뚜껑을 강성으로 밀어 넣게 되므로 작업자 확인이 필요합니다.
+
+### 0-4. 웨이포인트 이동 경로
+
+```mermaid
+flowchart LR
+    P5(("P5<br/>허브"))
+    P20(("P20<br/>테니스 슬롯"))
+    P3(("P3<br/>야구 슬롯"))
+    P6(("P6<br/>포장"))
+    P7(("P7<br/>불량"))
+    P24(("P24<br/>뚜껑 거치"))
+    P22(("P22<br/>뚜껑 체결"))
+    P26(("P26<br/>폐기통"))
+    P30(("P30<br/>폐기 투하"))
+
+    P5 <-->|"⊙P2"| P20
+    P5 <-->|"⊙P4"| P3
+    P5 <--> P6
+    P5 <--> P7
+    P5 <-->|"⊙P9"| P24
+    P5 <-->|"⊙P21"| P22
+    P5 <-->|"⊙P25"| P26
+    P26 <-->|"⊙P28 ⊙P29"| P30
+
+    style P5 fill:#2d5a3d,color:#fff
+    style P6 fill:#1a3d1a,color:#fff
+    style P7 fill:#3d1a1a,color:#fff
+```
+
+`⊙` 표시는 **무정지 통과 경유점**입니다. 모든 흐름이 허브 **P5**를 지나며,
+P5는 사방이 트여 있어 **45° 코너**로 가장 크게 돌아 부드럽게 통과합니다.
+자세한 내용은 [docs/PATH_OPTIMIZATION.md](docs/PATH_OPTIMIZATION.md) 참조.
 
 ---
 
@@ -348,6 +473,16 @@ ros2 run palpa_control robot_controller_stub_node   # robot_controller_node 대�
 
 > ⚠️ `MoveSplineJoint` 실행 중에 `amovej`를 겹쳐 보내면 **알람 없이 컨트롤러가 멈춥니다**(흰불).
 
+### 📚 심화 문서
+
+| 문서 | 내용 |
+|---|---|
+| **[docs/CLASSIFICATION.md](docs/CLASSIFICATION.md)** | 공 판별 알고리즘 — 파지력·폭만으로 종류·상태 구분, 특징 설계, 캐스케이드 게이트, **실측 56개 전수 100%** |
+| **[docs/PATH_OPTIMIZATION.md](docs/PATH_OPTIMIZATION.md)** | 경로 최적화 — radius가 왜 안 되는지(드라이버 소스 추적), lead_deg 방식의 원리·구현, 사고 6건과 해결 |
+| **[docs/WEIGHT_SENSING.md](docs/WEIGHT_SENSING.md)** | 무게 감지 — 차분 측정 원리, 계산식 전부, 노이즈 억제 2단, 설계 결정 4건 |
+| **[docs/AUTO_RECOVERY.md](docs/AUTO_RECOVERY.md)** | 외력 자동복구 — 감지·복구·재개 3단계, **진행 위치 기억(at 인덱스)**, 위치 추정의 함정 |
+| **[docs/COMPLIANCE_CONTROL.md](docs/COMPLIANCE_CONTROL.md)** | 순응제어 — 축별 강성 설계(왜 Z만 무르게, RZ만 단단하게), 뚜껑 안착·체결, MoveJ 금지 제약 |
+
 ---
 
 ## 7. 판정 알고리즘
@@ -369,7 +504,7 @@ ros2 run palpa_control robot_controller_stub_node   # robot_controller_node 대�
 > ⚠️ `busy=1`인 동안 grip bit를 읽으면 **허공에서도 접촉으로 오인**해 40N으로 슬램합니다.
 > 반드시 busy가 내려간 뒤에 판독해야 합니다.
 
-### 분류 기준 (`config/classify.py`)
+### 분류 기준 — 현재 적용값
 
 | 단계 | 판정 |
 |---|---|
@@ -377,7 +512,11 @@ ros2 run palpa_control robot_controller_stub_node   # robot_controller_node 대�
 | 테니스공 | `comp ≤ 3.6` 무압 · `≤ 5.5` 유압(정상) · 초과 구멍(불량) |
 | 야구공 | `comp ≤ 2.55` 하드 · 초과 소프트 |
 
-임계값은 `calibrate.py` 또는 대시보드의 **자동계산** 버튼으로 실측 CSV에서 다시 뽑을 수 있습니다.
+> ⚠️ **위 값은 `config/classify.py`의 코드 기본값이 아니라 `data/ball_thresholds.json`의 값입니다.**
+> 기동 시 `load_thresholds()`가 JSON을 읽어 **코드 기본값을 덮어씁니다.**
+> 코드만 고치고 JSON을 안 지우면 반영되지 않으니 주의하세요.
+
+임계값은 `calibrate.py` 또는 대시보드의 **자동계산** 버튼으로 실측 CSV에서 다시 뽑습니다.
 결과는 `data/ball_thresholds.json`에 저장되어 재시작해도 유지됩니다.
 
 > 📌 **캐스케이드 게이트 주의**: 첫 게이트는 반드시 **하위 전체**와 비교해야 합니다.

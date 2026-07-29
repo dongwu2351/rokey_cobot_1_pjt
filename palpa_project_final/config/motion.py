@@ -3,7 +3,6 @@
 
 from .classify import CLASSIFY
 import json as _json, os as _os
-import paths as _paths             # 데이터 파일 위치(저장소 동봉 data/)
 
 # 홈 자세 (관절각 deg) — 사이클 시작/종료 기준점
 HOME_POSJ = [0.0, 0.0, 90.0, 0.0, 90.0, 0.0]
@@ -69,7 +68,10 @@ SPEED = {
 # 값을 바꾸지 않는다. 구간별 동적 변경은 모드 전환 반복과 명령 실패를 유발한다.
 
 COLLISION = {
-    'fixed': 10,
+    # 1~100, 높을수록 민감(작은 힘에도 보호정지). 배치 시작 때 한 번만 설정된다.
+    # 10은 상당히 둔감해 손으로 밀어도 잘 안 걸렸다 → 시연용으로 상향.
+    # ⚠️ 너무 올리면 공을 쥔 채 감속할 때의 토크 스파이크를 충돌로 오인(5.7173)한다.
+    'fixed': 20,
 }
 
 import json as _json, os as _os
@@ -111,7 +113,7 @@ BLEND = {
 }
 
 SPEED_SEGMENTS = ['free', 'approach', 'extract', 'carry', 'drop']  # (구)프로파일 — 이동별 기본값 근거
-_SPEED_PATH = _paths.SPEED_FILE
+_SPEED_PATH = _os.path.expanduser('~/ws_cobot_pjt/ws_dsr/speed_profile.json')
 
 # ── 흐름별 '웨이포인트 이동' 세부 속도 (이동 1:1 개별 조절) ────────────────────
 # 각 이동은 고유 key로 개별 조절. MOVE_SPEED에 값 있으면 그 값, 없으면 default 사용.
@@ -198,6 +200,11 @@ MOTION = {
     'idle_confirm': 2,    # check_motion IDLE 연속 확인(완료레이스 방지의 주 가드)
     'settle_s': 0.15,     # 완료 후 정리 시간
     'timeout_s': 45.0,    # 이동 타임아웃
+    # 외력(보호정지)으로 멈췄을 때 사이클당 자동 복구 허용 횟수.
+    # 복구 후에는 '멈춘 그 이동의 절대목표'로 다시 보내 이어서 진행한다.
+    # 0이면 자동복구 없이 즉시 중단(예전 동작). 같은 자리에서 반복되면 실제
+    # 장애물일 수 있으므로 한도를 넘기면 멈추고 작업자를 부른다.
+    'trip_recover_n': 2,
     'use_check_motion': True,   # check_motion 서비스로 완료 가속(폴링 병행)
     'use_blend': False,   # dsr_controller2 async MoveJ는 radius를 전달하지 않으므로 사용 금지
     'blend_radius': 30.0, # 이송(경유→P3→놓기) 통과 반경

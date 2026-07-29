@@ -113,6 +113,7 @@ def _make_context(
     robot_states=None,
     move_success=True,
     release_width=110.0,
+    recover_trip=None,
 ):
     current = list(cfg.HOME_POSJ if start is None else start)
     trace = []
@@ -131,12 +132,23 @@ def _make_context(
     )
     state_values = list(robot_states or [1])
     state_index = 0
+    recovered = {"done": False}
 
     def next_robot_state():
         nonlocal state_index
+        # 복구가 성공했다면 실기와 같이 STANDBY 로 돌아온 것으로 본다.
+        # (이 처리가 없으면 가짜 로봇이 영원히 안전정지라 복구가 무한 반복된다)
+        if recovered["done"]:
+            return 1
         value = state_values[min(state_index, len(state_values) - 1)]
         state_index += 1
         return value
+
+    def call_recover_trip():
+        ok = bool(recover_trip()) if callable(recover_trip) else False
+        if ok:
+            recovered["done"] = True
+        return ok
 
     def move_is_successful(index, req):
         if callable(move_success):
@@ -212,6 +224,7 @@ def _make_context(
         waypoints=lambda: list(waypoints),
         state=state,
         motion_active=threading.Event(),
+        recover_trip=(call_recover_trip if callable(recover_trip) else None),
         ensure_auto=lambda: bool(ensure_auto),
         prepare_collision=lambda value: (
             collision_preparations.append(int(value)) is None
@@ -663,16 +676,47 @@ class WaypointRoutingTests(unittest.TestCase):
 
     def test_robot_safe_stop_aborts_without_sending_next_movej(self):
         # 시작검사=1, 진입 async 체인 전=1, 체인 최종 도착검사에서 SAFE_STOP=5.
+        # 이제 안전정지는 먼저 자동복구를 시도한다. 이 ctx에는 recover_trip이 없어
+        # 복구가 실패하고, 그때 '다음 movej를 보내지 않고 중단'하는지가 이 테스트의 요지다.
         result, ctx = self._run_context(
             "tennis_normal",
             "tennis_normal",
             robot_states=[1, 1, 5],
         )
         self.assertEqual(result["status"], "error")
-        self.assertIn("안전정지", result["error"])
+        self.assertIn("외력 감지", result["error"])
+        self.assertIn("자동 복구", result["error"])
+        # ★핵심: 복구에 실패했으면 로봇에 이동 명령을 더 보내지 않는다.
         self.assertEqual(len(ctx.move_requests), 3)
-        self.assertEqual(ctx.stop_modes, [2])
+        # 정지는 항상 감속정지(2)만 — E-stop(0/1)을 흉내 내지 않는다. 복구 시도가
+        # 한 번 더 부를 수 있으므로 횟수가 아니라 '모드'를 고정한다.
+        self.assertTrue(ctx.stop_modes)
+        self.assertEqual(set(ctx.stop_modes), {2})
         self.assertEqual(ctx.state.actions, ["open"])
+
+    def test_external_force_recovers_and_resumes_the_same_move(self):
+        """외력으로 멈춰도 자동 복구 뒤 '같은 절대 목표'로 이어서 끝까지 간다.
+
+        복구 성공(recover_trip=True) 이므로 사이클이 error 로 끝나면 안 되고,
+        멈춘 이동을 다시 보내므로 move 요청이 정상 경로보다 늘어나야 한다."""
+        calls = []
+
+        def recover():
+            calls.append(1)
+            return True
+
+        normal, _ = self._run_context("tennis_normal", "tennis_normal")
+        result, ctx = self._run_context(
+            "tennis_normal",
+            "tennis_normal",
+            robot_states=[1, 1, 5],
+            recover_trip=recover,
+        )
+        self.assertEqual(len(calls), 1)              # 복구가 실제로 불렸다
+        self.assertNotEqual(result["status"], "error")
+        self.assertEqual(result["decision"], normal["decision"])
+        self.assertGreater(len(ctx.move_requests), 3)   # 멈춘 이동을 다시 보냈다
+        self.assertEqual(set(ctx.stop_modes), {2})      # 감속정지만(E-stop 흉내 금지)
 
     def test_rejected_movej_is_not_automatically_retransmitted(self):
         result, ctx = self._run_context(

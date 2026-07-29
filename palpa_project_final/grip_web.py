@@ -25,6 +25,7 @@ tkinter가 ROS+Wayland에서 세그폴트를 내므로 GUI를 로컬 웹페이�
 그 후 브라우저에서  http://localhost:8760  접속.
 """
 import os
+import socket
 import sys
 from http.server import ThreadingHTTPServer
 
@@ -59,10 +60,17 @@ def main():
     RT.ROBOT = RobotMonitor(); RT.ROBOT.start()
     RT.JOG = JogWorker(); RT.JOG.start()
 
-    srv = ThreadingHTTPServer(('127.0.0.1', port), Handler)
+    srv = ThreadingHTTPServer(('0.0.0.0', port), Handler)   # 모든 인터페이스 바인드: 같은 와이파이 다른 PC에서도 접속
     url = f'http://localhost:{port}'
+    try:    # 다른 PC에서 접속할 주소 안내(기본 라우트 인터페이스 IP)
+        _s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); _s.connect(('8.8.8.8', 53))
+        lan_ip = _s.getsockname()[0]; _s.close()
+    except Exception:
+        lan_ip = None
     dom = os.environ.get('ROS_DOMAIN_ID', '(미설정=0)')
     print(f'\n  ✅ 대시보드 실행 중  →  브라우저에서 {url}  접속   (종료: Ctrl-C)')
+    if lan_ip:
+        print(f'  🌐 같은 와이파이 다른 PC:  http://{lan_ip}:{port}   (안 열리면: sudo ufw allow {port}/tcp)')
     print(f'  🔗 ROS_DOMAIN_ID = {dom}   ← 팔 드라이버와 같아야 로봇 데이터가 보입니다\n')
     # webbrowser.open 제거: 헤드리스/백그라운드에서 자식프로세스 대기(do_wait)로 멈추는 문제. 브라우저는 직접 여세요.
     try:

@@ -4,7 +4,8 @@
 import time
 
 import grip_config as cfg
-from .common import CycleStop, _find_named, find_order_wp
+from .common import (CycleStop, TripError, TripRecovery, trim_passed_steps,
+                     _find_named, find_order_wp)
 
 
 def run_waste(ctx):
@@ -22,6 +23,9 @@ def run_waste(ctx):
     def chk():
         if jog._cycle_stop:
             raise CycleStop()
+
+    # 폐기물 구간도 외력이면 자동 복구하고 멈춘 지점부터 이어간다(주문·뚜껑과 동일 장치).
+    trip = TripRecovery(ctx, jog, msg)
 
     def robot_state():
         rr = ctx.call(ctx.cstate, ctx.GetRobotState.Request(), cto=1.0)
@@ -79,6 +83,11 @@ def run_waste(ctx):
     LEAD = float(cfg.BLEND.get('waste_lead_deg', 10.0))
 
     def chain(steps):
+        """이송 체인 + 외력 자동복구(복구 후 남은 구간부터 이어감)."""
+        at = [0]     # 마지막으로 명령을 보낸 구간 — 복구 후 여기부터 이어간다
+        return trip.guarded(lambda: _chain_once(steps, at))
+
+    def _chain_once(steps, at=None):
         """[(target, move_key), ...] — 마지막만 정지, 중간은 LEAD°에서 다음 명령 투입."""
         if not cfg.BLEND.get('enabled', False) or len(steps) < 2:
             for st_ in steps:
@@ -88,17 +97,20 @@ def run_waste(ctx):
         cur = ctx.joints()
         if not cur or len(cur) != 6:
             raise RuntimeError('폐기물 시퀀스: 관절값 미수신')
-        while len(steps) > 1 and max(abs(steps[0][0][i] - cur[i]) for i in range(6)) < 0.5:
-            steps = steps[1:]          # 이미 서 있는 선행 경유점은 건너뜀
-        st = robot_state()
+        at = [0] if at is None else at
+        if at[0] == 0:      # 첫 실행에서만 '이미 그 점 위에 서 있는' 선행점을 건너뛴다
+            at[0] = len(steps) - len(trim_passed_steps(steps, cur))
+        st = trip.check()
         if st != 1 or not motion_idle():
             raise RuntimeError(f'폐기물 시퀀스 시작 전 STANDBY/IDLE 아님(state={st})')
         ctx.motion_active.set()
         try:
-            for i, st_ in enumerate(steps):
+            for i in range(at[0], len(steps)):
+                st_ = steps[i]
                 tgt, mk = st_[0], st_[1]
                 lead_i = st_[2] if len(st_) > 2 else None
                 last = (i == len(steps) - 1)
+                at[0] = i                      # ★재개 기준점
                 _send(tgt, mk)
                 if not last:
                     _wait_lead(tgt, lead_i)
@@ -116,9 +128,13 @@ def run_waste(ctx):
         rq.mode = 0; rq.blend_type = 0; rq.sync_type = 1
         r = ctx.call(ctx.cmj, rq, cto=5.0)
         if r is None or not getattr(r, 'success', False):
+            trip.trip_if_stopped()   # 외력으로 이미 멈춰 거절된 것이면 자동복구
             raise RuntimeError(f'폐기물 이동 거부({mk})')
 
     def _one(tgt, mk, last=True):
+        return trip.guarded(lambda: _one_once(tgt, mk, last))
+
+    def _one_once(tgt, mk, last=True):
         chk()
         ctx.motion_active.set()
         try:
@@ -140,9 +156,12 @@ def run_waste(ctx):
 
     def _wait_arrival(final):
         nd = float(cfg.MOTION['near_deg'])
-        t0 = time.time(); prev = None; okn = 0
+        t0 = time.time(); prev = None; okn = 0; last_st = time.time()
         while time.time() - t0 < 60.0:
             chk()
+            if time.time() - last_st > 2.0:   # 이동 중 외력 감시(없으면 60s 타임아웃까지 감)
+                last_st = time.time()
+                trip.check()
             c = ctx.joints()
             if (c and max(abs(c[i] - final[i]) for i in range(6)) < nd
                     and prev and max(abs(c[i] - prev[i]) for i in range(6)) < cfg.MOTION['still_deg']):
@@ -151,8 +170,7 @@ def run_waste(ctx):
                     st = robot_state()
                     if st == 1:
                         return True
-                    if st in (3, 5, 8, 9, 10):
-                        raise RuntimeError(f'폐기물 시퀀스 중 안전정지(state={st})')
+                    trip.check(st)
             else:
                 okn = 0
             prev = c

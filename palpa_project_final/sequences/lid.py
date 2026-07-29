@@ -4,7 +4,8 @@
 import time
 
 import grip_config as cfg
-from .common import CycleStop, _find_named, _find_named_wp, find_order_wp
+from .common import (CycleStop, TripError, TripRecovery, trim_passed_steps,
+                     _find_named, _find_named_wp, find_order_wp)
 
 
 def run_lid(ctx, phase):
@@ -21,6 +22,9 @@ def run_lid(ctx, phase):
         if jog._cycle_stop:
             raise CycleStop()
 
+    # 뚜껑 구간도 외력이 걸리면 자동 복구하고 멈춘 지점부터 이어간다(주문 사이클과 동일 장치).
+    trip = TripRecovery(ctx, jog, msg)
+
     def robot_state():
         rr = ctx.call(ctx.cstate, ctx.GetRobotState.Request(), cto=1.0)
         return getattr(rr, 'robot_state', -1) if rr else -1
@@ -30,6 +34,11 @@ def run_lid(ctx, phase):
         return r is not None and getattr(r, 'success', False) and r.status == 0
 
     def goto(target, vel=12.0, acc=10.0, timeout_s=45.0, near=None, move=None):
+        """외력으로 멈추면 자동 복구 후 '같은 절대 목표'로 이어서 이동한다."""
+        return trip.guarded(
+            lambda: _goto_once(target, vel, acc, timeout_s, near, move))
+
+    def _goto_once(target, vel=12.0, acc=10.0, timeout_s=45.0, near=None, move=None):
         chk()
         if move:                                  # '속도' 탭 이동 key가 있으면 그 속도 사용
             vel = float(cfg.move_vel(move))
@@ -49,10 +58,17 @@ def run_lid(ctx, phase):
             rq.mode = 0; rq.blend_type = 0; rq.sync_type = 1
             res = ctx.call(ctx.cmj, rq, cto=5.0)
             if res is None or not getattr(res, 'success', False):
+                # 외력으로 이미 보호정지돼 거절된 것이면 자동복구 대상이다
+                trip.trip_if_stopped()
                 raise RuntimeError('뚜껑 시퀀스 이동 거부 — 수동 확인 필요')
-            t0 = time.time(); prev = None; okn = 0
+            t0 = time.time(); prev = None; okn = 0; last_st = time.time()
             while time.time() - t0 < timeout_s:
                 chk()
+                # ★이동 중 주기적 안전상태 감시. 없으면 외력으로 멈춰도 '도착 미확인'
+                #   타임아웃(45s)까지 그냥 서 있는다(실측 문제).
+                if time.time() - last_st > 2.0:
+                    last_st = time.time()
+                    trip.check()
                 c = ctx.joints()
                 if (c and max(abs(c[i] - target[i]) for i in range(6)) < nd
                         and prev and max(abs(c[i] - prev[i]) for i in range(6)) < cfg.MOTION['still_deg']):
@@ -62,8 +78,7 @@ def run_lid(ctx, phase):
                         if st == 1:
                             time.sleep(0.1)
                             return True
-                        if st in (3, 5, 8, 9, 10):
-                            raise RuntimeError(f'뚜껑 이동 중 안전정지(state={st}) — 수동 확인')
+                        trip.check(st)
                 else:
                     okn = 0
                 prev = c
@@ -85,6 +100,11 @@ def run_lid(ctx, phase):
         return False
 
     def blend_chain(steps, radius=None, quick_end=False):
+        """뚜껑 이송용 블렌딩 + 외력 자동복구(복구 후 남은 구간부터 이어감)."""
+        at = [0]     # 마지막으로 명령을 보낸 구간 — 복구 후 여기부터 이어간다
+        return trip.guarded(lambda: _blend_chain_once(steps, radius, quick_end, at))
+
+    def _blend_chain_once(steps, radius=None, quick_end=False, at=None):
         """뚜껑 이송용 radius 블렌딩(MoveJoint.radius[mm] + ASYNC + 절대각).
         steps: [(target_posj, move_key), ...] — 마지막이 정지점.
         ★순응 구간(P10/P11)과 수직 이탈(P10→P12)에는 쓰지 않는다."""
@@ -96,16 +116,19 @@ def run_lid(ctx, phase):
         cur = ctx.joints()
         if not cur or len(cur) != 6:
             raise RuntimeError('관절값 미수신')
-        # 이미 서 있는 선행 경유점은 건너뛴다(전환 체인이 현재 위치에서 시작할 때).
-        while len(steps) > 1 and max(abs(steps[0][0][i] - cur[i]) for i in range(6)) < 0.5:
-            steps = steps[1:]
+        # 이미 지나온 선행 경유점은 건너뛴다(복구 후 재시도 시 뒤로 돌아가지 않게).
+        at = [0] if at is None else at
+        if at[0] == 0:      # 첫 실행에서만 '이미 그 점 위에 서 있는' 선행점을 건너뛴다
+            at[0] = len(steps) - len(trim_passed_steps(steps, cur))
         rad = float(cfg.BLEND['radius'] if radius is None else radius)
         ctx.motion_active.set()
         try:
-            for i, st_ in enumerate(steps):
+            for i in range(at[0], len(steps)):
+                st_ = steps[i]
                 tgt, mk = st_[0], st_[1]
                 lead_i = st_[2] if len(st_) > 2 else None
                 last = (i == len(steps) - 1)
+                at[0] = i                      # ★재개 기준점
                 v = float(cfg.move_vel(mk))
                 a = max(cfg.SPEED.get('cycle_min_acc', 10.0), v * 0.75)
                 rq = ctx.MoveJoint.Request()
@@ -117,6 +140,7 @@ def run_lid(ctx, phase):
                 rq.mode = 0; rq.blend_type = 0; rq.sync_type = 1
                 res = ctx.call(ctx.cmj, rq, cto=5.0)
                 if res is None or not getattr(res, 'success', False):
+                    trip.trip_if_stopped()   # 외력으로 이미 멈춰 거절된 것이면 자동복구
                     raise RuntimeError(f'뚜껑 블렌딩 이동 거부({i + 1}/{len(steps)})')
                 if not last:
                     _wait_lead(tgt, lead_i)   # 경유점 근접 시 다음 명령
@@ -127,9 +151,12 @@ def run_lid(ctx, phase):
         final = steps[-1][0]
         nd = float(cfg.MOTION['near_deg'])
         need = 1 if quick_end else 2
-        t0 = time.time(); prev = None; okn = 0
+        t0 = time.time(); prev = None; okn = 0; last_st = time.time()
         while time.time() - t0 < 60.0:
             chk()
+            if time.time() - last_st > 2.0:   # 이동 중 외력 감시(없으면 60s 타임아웃까지 감)
+                last_st = time.time()
+                trip.check()
             c = ctx.joints()
             if (c and max(abs(c[i] - final[i]) for i in range(6)) < nd
                     and prev and max(abs(c[i] - prev[i]) for i in range(6)) < cfg.MOTION['still_deg']):
@@ -138,8 +165,7 @@ def run_lid(ctx, phase):
                     st = robot_state()
                     if st == 1:
                         time.sleep(0.1); return True
-                    if st in (3, 5, 8, 9, 10):
-                        raise RuntimeError(f'뚜껑 블렌딩 중 안전정지(state={st})')
+                    trip.check(st)
             else:
                 okn = 0
             prev = c
@@ -158,6 +184,8 @@ def run_lid(ctx, phase):
         time.sleep(float(wait))
         return getattr(ctx.state, 'actual_width', None)
 
+    in_comp = [False]      # 순응제어 활성 여부 — 이 구간은 자동복구 대상에서 뺀다
+
     def comp_on():
         rq = ctx.TaskComplianceCtrl.Request()
         # 나사 체결용: X/Y·RZ는 단단(위치 유지+회전 토크 전달), Z·RX/RY는 부드럽게(안착·정렬 흡수)
@@ -166,13 +194,40 @@ def run_lid(ctx, phase):
         r = ctx.call(ctx.ccomp_on, rq, cto=2.0)
         if r is None or not getattr(r, 'success', False):
             raise RuntimeError('순응제어 ON 실패')
+        in_comp[0] = True
         time.sleep(0.6)
 
     def comp_off():
         ctx.call(ctx.ccomp_off, ctx.ReleaseComplianceCtrl.Request(), cto=2.0)
+        in_comp[0] = False
         time.sleep(0.4)
 
     def movel_z(dz_mm, vmm=20.0):
+        """BASE +Z 상대 직선이동 + 외력 자동복구.
+
+        ★상대이동(mode=1)이라 재시도하면 '멈춘 지점에서 다시 dz_mm'이 되어 총 이동이
+          늘어난다. 그래서 복구 후에는 남은 거리만큼만 다시 간다."""
+        moved = [0.0]
+
+        def once():
+            z0 = _cur_z()
+            try:
+                _movel_z_once(dz_mm - moved[0], vmm)
+            finally:
+                z1 = _cur_z()
+                if z0 is not None and z1 is not None:
+                    moved[0] += (z1 - z0)
+            return True
+        return trip.guarded(once)
+
+    def _cur_z():
+        px = (ctx.robot() or {}).get('posx') if callable(getattr(ctx, 'robot', None)) else None
+        try:
+            return float(px[2]) if px and len(px) >= 3 else None
+        except Exception:
+            return None
+
+    def _movel_z_once(dz_mm, vmm=20.0):
         """BASE +Z 상대 직선이동(툴이 아래를 봐 툴-Z와 동일 방향). 완료 후 상태 확인."""
         chk()
         ctx.motion_active.set()
@@ -184,12 +239,11 @@ def run_lid(ctx, phase):
             rq.mode = 1; rq.blend_type = 0; rq.sync_type = 0
             res = ctx.call(ctx.cml, rq, cto=30.0)
             if res is None or not getattr(res, 'success', False):
+                trip.trip_if_stopped()
                 raise RuntimeError('통 들어올리기/내려놓기(MoveL) 거부')
         finally:
             ctx.motion_active.clear()
-        st = robot_state()
-        if st in (3, 5, 8, 9, 10):
-            raise RuntimeError(f'직선 이동 중 안전정지(state={st})')
+        trip.check()
 
     def movel_abs(posx, vmm=12.0, vdeg=15.0, cto=30.0):
         """절대 posx로 직선(태스크) 이동 — ★순응제어 중 movej는 거부되므로 순응 구간은 이것만 사용."""
@@ -203,12 +257,21 @@ def run_lid(ctx, phase):
             rq.mode = 0; rq.blend_type = 0; rq.sync_type = 0
             res = ctx.call(ctx.cml, rq, cto=cto)
             if res is None or not getattr(res, 'success', False):
+                if not in_comp[0]:
+                    trip.trip_if_stopped()
                 raise RuntimeError('순응 구간 직선이동(MoveL) 거부')
         finally:
             ctx.motion_active.clear()
         st = robot_state()
-        if st in (3, 5, 8, 9, 10):
-            raise RuntimeError(f'순응 구간 이동 중 안전정지(state={st})')
+        # ★순응 구간은 자동복구하지 않는다: 안전정지로 순응이 풀린 뒤 같은 목표로 다시
+        #   보내면 뚜껑을 '강성'으로 밀어 넣는다. 작업자가 확인하는 편이 안전하다.
+        if in_comp[0]:
+            if st in (3, 5, 8, 9, 10):
+                raise RuntimeError(
+                    f'순응 구간(뚜껑 안착) 이동 중 안전정지(state={st}) — '
+                    '자동복구 금지 구간, 뚜껑 상태 확인 후 수동 재시작')
+        else:
+            trip.check(st)
 
     def _read_fz():
         """Fz(BASE) 1회 읽기 — GetToolForce 직접 호출.

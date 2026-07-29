@@ -4,7 +4,8 @@
 import time
 
 import grip_config as cfg
-from .common import CycleStop, TripError, find_wp, find_order_wp
+from .common import (CycleStop, TripError, TripRecovery, trim_passed_steps,
+                     find_wp, find_order_wp)
 
 
 def run_cycle(ctx, first=True, home_return=True, finish_only=False,
@@ -36,13 +37,27 @@ def run_cycle(ctx, first=True, home_return=True, finish_only=False,
         r = ctx.call(ctx.cchk, ctx.CheckMotion.Request(), cto=0.8)
         return r is not None and getattr(r, 'success', False) and r.status == 0
 
+    def alarm_code():
+        f = getattr(ctx, 'last_alarm', None)
+        try:
+            return f() if callable(f) else None
+        except Exception:
+            return None
+
     def check_state_or_raise():
         st = robot_state()
         if st in (3, 5, 8, 9, 10):
-            raise TripError()
+            raise TripError(st, alarm_code())
         if st in (6, 15):
             raise RuntimeError(f'복구 금지 로봇 상태({st})')
         return st
+
+    # 사이클당 자동복구 한도·문구·절차는 세 시퀀스가 공용 장치를 쓴다(sequences/common.py).
+    # 같은 자리에서 계속 걸리면 진짜 장애물일 수 있으므로 한도를 넘기면 작업자를 부른다.
+    trip = TripRecovery(ctx, jog, msg)
+
+    def force_recover(where, exc=None):
+        return trip.recover(where, exc)
 
     def wait_arrival(target, quick=False, timeout_s=None):
         """완료판정: 목표 near_deg 이내 + 정지 연속 confirm_n회 + check_motion 유휴.
@@ -101,13 +116,19 @@ def run_cycle(ctx, first=True, home_return=True, finish_only=False,
         raise RuntimeError(f"이동 미완료({int(timeout_s)}s) — {jog.cycle_msg}")
 
     def goto(target, profile='free', quick=False, move=None):
-        """안전정지는 실제 접촉일 수 있으므로 자동 복구·재충돌하지 않고 즉시 중단한다.
+        """외력으로 멈추면 자동 복구 후 '같은 절대 목표'로 이어서 이동한다.
+
+        재개 지점 = 이 함수가 들고 있는 target(기억하고 있는 작업 위치).
+        절대목표(mode=0)라 이미 지나온 거리만큼 다시 가지 않고 남은 만큼만 부드럽게 잇는다.
+        반복 재발은 실제 장애물일 수 있어 force_recover()가 횟수를 제한한다.
         move: '속도' 탭 이동 key(있으면 이 이동만의 속도 사용, 없으면 profile 기본)."""
-        try:
-            return _goto_once(target, profile, quick, move)
-        except TripError as exc:
-            msg('🛡 안전정지 감지 — 작업자 확인 전 자동 재이동 금지')
-            raise RuntimeError('안전정지 감지 — 원인 확인 후 수동 복구 필요') from exc
+        while True:
+            try:
+                return _goto_once(target, profile, quick, move)
+            except TripError as exc:
+                if not force_recover(jog.cycle_msg, exc):
+                    raise RuntimeError(
+                        '외력 감지 — 자동 복구 한도 초과/실패, 원인 확인 후 재시작') from exc
 
     def _goto_once(target, profile='free', quick=False, move=None):
         chk()
@@ -147,6 +168,11 @@ def run_cycle(ctx, first=True, home_return=True, finish_only=False,
             res = ctx.call(ctx.cmj, req, cto=5.0)
             if res is None or not getattr(res, 'success', False):
                 jog.last_motion['status'] = 'rejected'
+                # ★'MoveJ 거부'는 대개 결과이지 원인이 아니다 — 외력으로 이미 보호정지된
+                #   로봇이 명령을 거절한 것. 상태를 확인해 외력이면 그렇게 보고한다.
+                st2 = robot_state()
+                if st2 in (3, 5, 8, 9, 10):
+                    raise TripError(st2, alarm_code())
                 raise RuntimeError(f'이동 거부 — 자동복구/재전송 금지 · {jog.cycle_msg}')
             # 도착 확인 + 오차 잔류 시 같은 절대목표를 제한적으로 재조준한다.
             travel_s = max(abs(d) for d in delta) / max(v, 1.0)
@@ -168,6 +194,9 @@ def run_cycle(ctx, first=True, home_return=True, finish_only=False,
                 rq2.mode = 0; rq2.blend_type = 0; rq2.sync_type = 1
                 rr = ctx.call(ctx.cmj, rq2, cto=5.0)
                 if rr is None or not getattr(rr, 'success', False):
+                    st3 = robot_state()               # 보정 중 외력으로 멈춘 경우
+                    if st3 in (3, 5, 8, 9, 10):
+                        raise TripError(st3, alarm_code())
                     raise RuntimeError('잔여 오차 보정 MoveJ 거부')
             jog.last_motion['status'] = 'arrival_failed'
             raise RuntimeError(f'도착 오차 잔류 — {jog.cycle_msg}')
@@ -194,7 +223,7 @@ def run_cycle(ctx, first=True, home_return=True, finish_only=False,
             time.sleep(0.02)
         return False        # 타임아웃 — 그래도 다음 명령을 보내 진행(정지 후 이동일 뿐)
 
-    def blend_chain(steps, radius=None, quick_end=False):
+    def blend_chain(steps, radius=None, quick_end=False, at=None):
         """async MoveJ를 경유점 근처에서 이어 보내는 기존 이송 체인.
 
         steps: [(target_posj, move_key), ...] — 마지막이 최종 정지점.
@@ -214,18 +243,27 @@ def run_cycle(ctx, first=True, home_return=True, finish_only=False,
             cur = ctx.joints()
             if not cur or len(cur) != 6:
                 raise RuntimeError('최신 관절값 수신 안 됨(토픽/드라이버 확인)')
-            # 이미 서 있는 선행 경유점은 건너뛴다(전환 체인이 현재 위치에서 시작할 때).
-            while len(steps) > 1 and max(abs(steps[0][0][i] - cur[i]) for i in range(6)) < 0.5:
-                steps = steps[1:]
+            # ★재개 지점은 '어디까지 명령을 보냈는지'를 기억해 정한다(위치 추정 아님).
+            #   at[0] = 마지막으로 MoveJ 를 보낸 구간 번호. 복구 후에는 그 구간부터
+            #   다시 보내면 되므로, 지나온 경유점을 지오메트리로 추측할 필요가 없다.
+            at = [0] if at is None else at
+            if at[0] == 0:
+                # 첫 실행에서만: 이미 그 점 위에 서 있으면 건너뛴다(전환 체인 시작 처리).
+                # ※'다음 점에 더 가깝다' 같은 추정은 쓰지 않는다 — 관절공간 경유점은
+                #   일직선이 아니라 안 지나온 점도 잘려 회피 경유가 무효가 된다.
+                keep = trim_passed_steps(steps, cur)
+                at[0] = len(steps) - len(keep)
             st = check_state_or_raise()
             if st != 1 or not motion_idle():
                 raise RuntimeError(f'블렌딩 시작 전 STANDBY/IDLE 아님(state={st})')
             ctx.motion_active.set()
             try:
-                for i, st_ in enumerate(steps):
+                for i in range(at[0], len(steps)):
+                    st_ = steps[i]
                     tgt, mk = st_[0], st_[1]
                     lead_i = st_[2] if len(st_) > 2 else None
                     last = (i == len(steps) - 1)
+                    at[0] = i                      # ★여기까지 명령을 보냈다(재개 기준점)
                     v = max(cfg.SPEED['min_vel'], float(cfg.move_vel(mk, 'carry')))
                     a = max(cfg.SPEED.get('cycle_min_acc', 10.0),
                             v * cfg.SPEED['acc_ratio_carry'])
@@ -248,6 +286,9 @@ def run_cycle(ctx, first=True, home_return=True, finish_only=False,
                     res = ctx.call(ctx.cmj, req, cto=5.0)
                     if res is None or not getattr(res, 'success', False):
                         jog.last_motion['status'] = 'rejected'
+                        st2 = robot_state()          # 외력으로 이미 멈춰 거부된 것인지 확인
+                        if st2 in (3, 5, 8, 9, 10):
+                            raise TripError(st2, alarm_code())
                         raise RuntimeError(f'블렌딩 MoveJ 거부({i + 1}/{len(steps)})')
                     if not last:
                         wait_lead(tgt, lead_i)         # 경유점에 근접했을 때 다음 명령 투입
@@ -263,10 +304,35 @@ def run_cycle(ctx, first=True, home_return=True, finish_only=False,
             finally:
                 ctx.motion_active.clear()
         except TripError as exc:
-            msg('🛡 안전정지 감지(블렌딩) — 작업자 확인 전 자동 재이동 금지')
-            raise RuntimeError('안전정지 감지 — 원인 확인 후 수동 복구 필요') from exc
+            # 복구 후 '기억하고 있는 구간(at)'부터 같은 체인을 이어서 다시 태운다.
+            # 멈춘 그 이동의 절대목표를 다시 보내므로 중복 이동도 되돌아감도 없다.
+            if force_recover(f'{jog.cycle_msg} (블렌딩)', exc):
+                return blend_chain(steps, radius=radius, quick_end=quick_end, at=at)
+            raise RuntimeError(
+                '외력 감지 — 자동 복구 한도 초과/실패, 원인 확인 후 재시작') from exc
 
     def spline_return_via_p5(next_lift, next_pick=None):
+        """P5 무정지 복귀 + 외력 자동복구.
+
+        복구 후에는 스플라인을 다시 태우지 않는다 — MoveSplineJoint는 항상 시작점(P5)
+        부터 곡선을 다시 그리므로, P5를 이미 지난 지점에서 멈췄다면 뒤로 되돌아간다.
+        남은 구간만 goto 로 이어 붙인다(goto 는 그 자체로 다시 자동복구된다).
+        """
+        try:
+            return _spline_return_once(next_lift, next_pick)
+        except TripError as exc:
+            if not force_recover(f'{jog.cycle_msg} (P5 복귀)', exc):
+                raise RuntimeError(
+                    '외력 감지 — 자동 복구 한도 초과/실패, 원인 확인 후 재시작') from exc
+            # 스플라인은 [P5, next_lift] 두 점을 한 번에 넘긴 것이라 '어디까지 갔는지'를
+            # 알 수 없다. 안전하게 P5부터 순서대로 다시 간다(절대목표라 중복 없음).
+            for tgt, mk in ((common, 'ord_return'), (next_lift, 'ord_to_lift')):
+                goto(tgt, 'free', quick=True, move=mk)
+            if next_pick is not None:
+                goto(next_pick, 'approach', move='ord_descend')
+            return True
+
+    def _spline_return_once(next_lift, next_pick=None):
         """공을 놓은 위치에서 P5와 P2/P4를 모두 무정지 통과해 파지위치까지 간다.
 
         dsr_controller2는 async MoveJ(amovej) 경로에서 radius를 전달하지 않으므로
@@ -317,6 +383,8 @@ def run_cycle(ctx, first=True, home_return=True, finish_only=False,
             res = ctx.call(ctx.cspl, req, cto=5.0)
             if res is None or not getattr(res, 'success', False):
                 jog.last_motion['status'] = 'rejected'
+                # 외력으로 이미 보호정지된 로봇이 거절한 것일 수 있다 — 그러면 자동복구 대상
+                trip.trip_if_stopped()
                 raise RuntimeError('P5 연속복귀 MoveSplineJoint 거부')
             travel = max(abs(next_lift[i] - cur[i]) for i in range(6))
             timeout_s = max(float(cfg.MOTION['timeout_s']),
@@ -481,7 +549,7 @@ def run_cycle(ctx, first=True, home_return=True, finish_only=False,
             msg('⚠️ 공 못 잡음 → P5 안전 복귀')
             goto(source_lift, 'approach')
             goto(common, 'free')
-            msg(f'🚨 {desired_type} 슬롯에 공이 없습니다')
+            msg(f'🚨 {desired_type} 슬롯을 보충해주세요')
             return {'status': 'empty', 'target': desired}
 
         # 테니스 P20/야구 P3에서 바로 크기+강성 판정.
